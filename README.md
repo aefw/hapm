@@ -1071,8 +1071,6 @@ APP_ADMIN_DEFAULT_PASSWORD=<kuat>
 
 **CMC:**
 ```env
-CMC_STORAGE_PATH=/data/storage/certificates   # lokasi cert files
-CMC_WEBROOT_PATH=/data/acme-webroot           # webroot untuk HTTP-01 challenge
 CMC_ACME_SERVICE_URL=http://hapm-acme:8889    # URL hapm-acme (internal Docker network)
 CMC_CHALLENGE_ADDR=<ip:port>                   # IP:port HAPM yg bisa diakses internet (HTTP-01)
 ```

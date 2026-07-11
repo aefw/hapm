@@ -156,8 +156,9 @@ func Load() (*Config, error) {
 	}
 
 	// CMC — Certificate Management Center
-	cfg.CMC.StoragePath = getEnv("CMC_STORAGE_PATH", "/data/storage/certificates")
-	cfg.CMC.WebRootPath = getEnv("CMC_WEBROOT_PATH", "/data/acme-webroot")
+	base := dataDir()
+	cfg.CMC.StoragePath = getEnv("CMC_STORAGE_PATH", base+"/storage/certificates")
+	cfg.CMC.WebRootPath = getEnv("CMC_WEBROOT_PATH", base+"/acme-webroot")
 	cfg.CMC.ACMEServiceURL = getEnv("CMC_ACME_SERVICE_URL", "http://hapm-acme:8889")
 	cfg.CMC.ChallengeAddr = getEnv("CMC_CHALLENGE_ADDR", "")
 
@@ -179,12 +180,17 @@ func (c *Config) IsProduction() bool {
 	return c.App.Mode == "production"
 }
 
-// detectDBPath menentukan path SQLite secara otomatis tanpa perlu konfigurasi env.
-// Urutan prioritas:
-//  1. APP_DB_PATH — jika diset eksplisit, gunakan itu
-//  2. /data/hapm.db — path volume Docker (jika /data tersedia)
-//  3. ./data/hapm.db — direktori data lokal (jika ./data ada)
-//  4. ./hapm.db — fallback current working directory
+// dataDir mengembalikan direktori data utama:
+// /data (Docker volume) jika tersedia, atau ./data untuk lokal.
+func dataDir() string {
+	if _, err := os.Stat("/data"); err == nil {
+		return "/data"
+	}
+	return "./data"
+}
+
+// detectDBPath menentukan path SQLite secara otomatis.
+// Prioritas: APP_DB_PATH env → /data/hapm.db → ./data/hapm.db → ./hapm.db
 func detectDBPath() string {
 	if v := os.Getenv("APP_DB_PATH"); v != "" {
 		return v
