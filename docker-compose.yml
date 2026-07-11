@@ -1,0 +1,158 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HAPM — HAProxy Manager + Certificate Management Center (CMC)
+#
+# Quick start:
+#   cp .env.example .env
+#   # Edit .env — isi JWT secrets, encryption key, dan CMC settings
+#   docker compose up -d
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ─── HAPM API Server ───────────────────────────────────────────────────────
+  hapm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hapm:latest
+    container_name: hapm
+    restart: unless-stopped
+
+    ports:
+      - "${APP_PORT:-8080}:8080"
+
+    volumes:
+      - hapm_data:/data
+
+    environment:
+      # App
+      APP_NAME: ${APP_NAME:-HAProxy Manager}
+      APP_MODE: ${APP_MODE:-production}
+      APP_PORT: "8080"
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
+
+      # Database
+      APP_DB_DRIVER: ${APP_DB_DRIVER:-sqlite}
+      APP_DB_PATH: ${APP_DB_PATH:-/data/hapm.db}
+
+      # JWT
+      APP_JWT_ACCESS_SECRET: ${APP_JWT_ACCESS_SECRET}
+      APP_JWT_REFRESH_SECRET: ${APP_JWT_REFRESH_SECRET}
+      APP_JWT_ACCESS_EXPIRY: ${APP_JWT_ACCESS_EXPIRY:-15m}
+      APP_JWT_REFRESH_EXPIRY: ${APP_JWT_REFRESH_EXPIRY:-168h}
+
+      # Security
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY}
+
+      # Rate limiting
+      APP_RATE_LIMIT_LOGIN: ${APP_RATE_LIMIT_LOGIN:-5}
+      APP_RATE_LIMIT_LOGIN_WINDOW: ${APP_RATE_LIMIT_LOGIN_WINDOW:-15}
+      APP_RATE_LIMIT_API: ${APP_RATE_LIMIT_API:-120}
+      APP_ACCOUNT_LOCKOUT_ATTEMPTS: ${APP_ACCOUNT_LOCKOUT_ATTEMPTS:-5}
+      APP_ACCOUNT_LOCKOUT_DURATION: ${APP_ACCOUNT_LOCKOUT_DURATION:-30m}
+
+      # Logging
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-info}
+      APP_LOG_FORMAT: ${APP_LOG_FORMAT:-json}
+
+      # CMC — Certificate Management Center
+      CMC_STORAGE_PATH: /data/storage/certificates
+      CMC_WEBROOT_PATH: /data/acme-webroot
+      CMC_ACME_SERVICE_URL: http://hapm-acme:8889
+      # CMC_CHALLENGE_ADDR: IP:PORT yang bisa diakses HAProxy node untuk HTTP-01
+      # Contoh: CMC_CHALLENGE_ADDR=203.0.113.10:8080
+      CMC_CHALLENGE_ADDR: ${CMC_CHALLENGE_ADDR:-}
+
+    depends_on:
+      hapm-acme:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "/hapm", "-health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+    networks:
+      - hapm_net
+
+  # ─── hapm-acme: ACME Worker Service ───────────────────────────────────────
+  hapm-acme:
+    build:
+      context: .
+      dockerfile: Dockerfile.acme
+    image: hapm-acme:latest
+    container_name: hapm-acme
+    restart: unless-stopped
+
+    volumes:
+      - hapm_data:/data
+
+    environment:
+      ACME_PORT: "8889"
+      LEGO_PATH: /usr/local/bin/lego
+
+    # hapm-acme TIDAK di-expose ke host — hanya accessible via internal Docker network
+    # Tidak ada ports: mapping yang diperlukan
+    expose:
+      - "8889"
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8889/internal/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - hapm_net
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Volumes
+# ─────────────────────────────────────────────────────────────────────────────
+volumes:
+  hapm_data:
+    name: hapm_data
+    driver: local
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Networks
+# hapm dan hapm-acme berkomunikasi via internal network ini.
+# HAProxy nodes tidak berada di network ini — mereka external VMs.
+# ─────────────────────────────────────────────────────────────────────────────
+networks:
+  hapm_net:
+    name: hapm_net
+    driver: bridge

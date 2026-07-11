@@ -1,0 +1,55 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# hapm-acme — ACME Worker Service
+# Menjalankan LEGO CLI untuk issue/renew/revoke certificate Let's Encrypt
+# ─────────────────────────────────────────────────────────────────────────────
+
+FROM golang:1.23-alpine AS builder
+
+WORKDIR /app
+
+# Install git (dibutuhkan go mod)
+RUN apk add --no-cache git
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o /hapm-acme ./cmd/hapm-acme
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Runtime image
+# ─────────────────────────────────────────────────────────────────────────────
+FROM alpine:3.20
+
+# Install LEGO CLI
+ARG LEGO_VERSION=v4.17.4
+RUN apk add --no-cache ca-certificates curl && \
+    ARCH=$(uname -m) && \
+    case "$ARCH" in \
+      x86_64)  LEGO_ARCH="amd64" ;; \
+      aarch64) LEGO_ARCH="arm64" ;; \
+      *)       LEGO_ARCH="amd64" ;; \
+    esac && \
+    curl -fsSL "https://github.com/go-acme/lego/releases/download/${LEGO_VERSION}/lego_${LEGO_VERSION}_linux_${LEGO_ARCH}.tar.gz" \
+      -o /tmp/lego.tar.gz && \
+    tar -xzf /tmp/lego.tar.gz -C /usr/local/bin lego && \
+    chmod +x /usr/local/bin/lego && \
+    rm /tmp/lego.tar.gz && \
+    lego --version
+
+# Copy binary
+COPY --from=builder /hapm-acme /hapm-acme
+
+# Direktori data (shared volume dengan hapm)
+RUN mkdir -p /data/storage/certificates /data/acme-webroot/.well-known/acme-challenge
+
+EXPOSE 8889
+
+ENV ACME_PORT=8889
+ENV LEGO_PATH=/usr/local/bin/lego
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD wget -qO- http://localhost:8889/internal/health || exit 1
+
+ENTRYPOINT ["/hapm-acme"]

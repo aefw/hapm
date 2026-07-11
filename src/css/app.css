@@ -1,0 +1,1233 @@
+/* ==========================================================================
+   GETUIKIT RESPONSIVE VISIBILITY SYNCHRONIZED WITH FRAMEWORK7 BREAKPOINTS
+   ========================================================================== */
+
+/* --- 1. UTILITY: UK-HIDDEN (Sembunyikan elemen mulai dari ukuran tersebut ke atas) --- */
+
+/* @s (Small) -> Tersembunyi di >= 568px */
+@media (min-width: 568px) {
+  .uk-hidden\@s {
+    display: none !important;
+  }
+}
+
+/* @m (Medium) -> Tersembunyi di >= 768px */
+@media (min-width: 768px) {
+  .uk-hidden\@m {
+    display: none !important;
+  }
+}
+
+/* @l (Large) -> Tersembunyi di >= 1024px */
+@media (min-width: 1024px) {
+  .uk-hidden\@l {
+    display: none !important;
+  }
+}
+
+/* @xl (XLarge) -> Tersembunyi di >= 1200px */
+@media (min-width: 1200px) {
+  .uk-hidden\@xl {
+    display: none !important;
+  }
+}
+
+
+/* --- 2. UTILITY: UK-VISIBLE (Hanya muncul mulai dari ukuran tersebut ke atas) --- */
+
+/* @s (Small) -> Hanya muncul di >= 568px */
+@media (max-width: 567px) {
+  .uk-visible\@s {
+    display: none !important;
+  }
+}
+
+/* @m (Medium) -> Hanya muncul di >= 768px */
+@media (max-width: 767px) {
+  .uk-visible\@m {
+    display: none !important;
+  }
+}
+
+/* @l (Large) -> Hanya muncul di >= 1024px */
+@media (max-width: 1023px) {
+  .uk-visible\@l {
+    display: none !important;
+  }
+}
+
+/* @xl (XLarge) -> Hanya muncul di >= 1200px */
+@media (max-width: 1199px) {
+  .uk-visible\@xl {
+    display: none !important;
+  }
+}
+
+/* ============================================================
+   HAPM — CSS Variables
+   ============================================================ */
+:root {
+  --hapm-sidebar-width    : 260px;
+  --hapm-sidebar-bg       : #1a1f2e;
+  --hapm-sidebar-text     : #94a3b8;
+  --hapm-sidebar-text-h   : #e2e8f0;
+  --hapm-sidebar-active-bg: rgba(59, 130, 246, 0.15);
+  --hapm-sidebar-active-cl: #60a5fa;
+  --hapm-sidebar-border   : rgba(255, 255, 255, 0.07);
+  --hapm-sidebar-section  : #475569;
+  --hapm-sidebar-logo-h   : 64px;
+  --hapm-sidebar-footer-h : 64px;
+
+  --hapm-status-online    : #22c55e;
+  --hapm-status-offline   : #ef4444;
+  --hapm-status-unknown   : #94a3b8;
+  --hapm-status-pending   : #f59e0b;
+  --hapm-status-running   : #3b82f6;
+  --hapm-status-success   : #22c55e;
+  --hapm-status-failed    : #ef4444;
+  --hapm-status-rolled_back: #f59e0b;
+
+  --hapm-card-bg          : #ffffff;
+  --hapm-card-border      : #e2e8f0;
+  --hapm-card-shadow      : 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* ============================================================
+   Panel Override — sidebar selalu visible di desktop
+   ============================================================ */
+.panel.hapm-panel {
+  --f7-panel-width: var(--hapm-sidebar-width);
+}
+
+/* ============================================================
+   Sidebar
+   ============================================================ */
+.hapm-sidebar {
+  display       : flex;
+  flex-direction: column;
+  height        : 100%;
+  background    : var(--hapm-sidebar-bg);
+  overflow      : hidden;
+}
+
+/* Logo */
+.hapm-sidebar-logo {
+  display    : flex;
+  align-items: center;
+  gap        : 12px;
+  height     : var(--hapm-sidebar-logo-h);
+  padding    : 0 20px;
+  border-bottom: 1px solid var(--hapm-sidebar-border);
+  flex-shrink: 0;
+}
+.hapm-sidebar-logo-icon {
+  display        : flex;
+  align-items    : center;
+  justify-content: center;
+  width          : 36px;
+  height         : 36px;
+  background     : #3b82f6;
+  border-radius  : 8px;
+  color          : #fff;
+}
+.hapm-sidebar-logo-icon .material-icons { font-size: 20px; }
+.hapm-sidebar-logo-title {
+  font-size  : 15px;
+  font-weight: 700;
+  color      : #f1f5f9;
+  line-height: 1.1;
+  letter-spacing: 0.3px;
+}
+.hapm-sidebar-logo-sub {
+  font-size  : 10px;
+  color      : var(--hapm-sidebar-text);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Nav list */
+.hapm-sidebar-nav {
+  flex       : 1;
+  overflow-y : auto;
+  overflow-x : hidden;
+  padding    : 8px 0;
+}
+.hapm-sidebar-nav::-webkit-scrollbar { width: 4px; }
+.hapm-sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+.hapm-sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+
+.hapm-nav-list.list {
+  margin: 0;
+}
+.hapm-nav-list.list ul {
+  background: transparent;
+}
+.hapm-nav-list.list ul::before,
+.hapm-nav-list.list ul::after { display: none; }
+
+/* Nav section header */
+.hapm-nav-section {
+  list-style: none;
+  padding   : 12px 20px 4px;
+}
+.hapm-nav-section span {
+  font-size     : 10px;
+  font-weight   : 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color         : var(--hapm-sidebar-section);
+}
+
+/* Nav item */
+.hapm-nav-item.item-link {
+  color          : var(--hapm-sidebar-text);
+  border-radius  : 8px;
+  margin         : 2px 10px;
+  transition     : background 0.15s, color 0.15s;
+  text-decoration: none;
+}
+.hapm-nav-item .item-content {
+  padding   : 10px 12px;
+  min-height: auto;
+}
+.hapm-nav-item .item-inner {
+  padding   : 0;
+  min-height: auto;
+}
+.hapm-nav-item .item-inner::after { display: none; }
+.hapm-nav-item .item-media {
+  min-width  : 0;
+  width      : 28px;
+  margin-right: 10px;
+  color      : inherit;
+}
+.hapm-nav-item .item-media .material-icons { font-size: 20px; }
+.hapm-nav-item .item-title {
+  font-size  : 14px;
+  font-weight: 500;
+  color      : inherit;
+}
+.hapm-nav-item:hover {
+  background: var(--hapm-sidebar-hover, rgba(255,255,255,0.06));
+  color     : var(--hapm-sidebar-text-h);
+}
+.hapm-nav-item.hapm-nav-active {
+  background: var(--hapm-sidebar-active-bg);
+  color     : var(--hapm-sidebar-active-cl);
+}
+.hapm-nav-item.hapm-nav-active .material-icons {
+  color: var(--hapm-sidebar-active-cl);
+}
+
+/* Sidebar footer */
+.hapm-sidebar-footer {
+  border-top : 1px solid var(--hapm-sidebar-border);
+  padding    : 12px 16px;
+  flex-shrink: 0;
+}
+.hapm-sidebar-user {
+  display    : flex;
+  align-items: center;
+  gap        : 10px;
+}
+.hapm-sidebar-avatar .material-icons {
+  font-size: 32px;
+  color    : var(--hapm-sidebar-text);
+}
+.hapm-sidebar-user-info { flex: 1; min-width: 0; }
+.hapm-sidebar-username {
+  font-size    : 13px;
+  font-weight  : 600;
+  color        : var(--hapm-sidebar-text-h);
+  white-space  : nowrap;
+  overflow     : hidden;
+  text-overflow: ellipsis;
+}
+.hapm-sidebar-role {
+  font-size: 11px;
+  color    : var(--hapm-sidebar-text);
+}
+.hapm-sidebar-logout {
+  color      : var(--hapm-sidebar-text);
+  cursor     : pointer;
+  line-height: 1;
+  padding    : 4px;
+  border-radius: 4px;
+  transition : color 0.15s;
+}
+.hapm-sidebar-logout:hover { color: #ef4444; }
+.hapm-sidebar-logout .material-icons { font-size: 18px; }
+
+/* ============================================================
+   View main — offset sidebar di desktop
+   Hanya margin-left; JANGAN tambahkan left pada .navbar
+   karena navbar MD theme sudah di dalam view (sticky), bukan fixed
+   ============================================================ */
+@media (min-width: 1024px) {
+  .view-main {
+    margin-left: var(--hapm-sidebar-width) !important;
+  }
+}
+
+/* ============================================================
+   Navbar
+   ============================================================ */
+.navbar.hapm-navbar {
+  --f7-navbar-bg-color: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+}
+.navbar.hapm-navbar .navbar-inner {
+  padding: 0 8px 0 16px;
+}
+
+/* Hamburger untuk mobile */
+.hapm-menu-btn { display: none; }
+@media (max-width: 1023px) {
+  .hapm-menu-btn { display: flex; }
+}
+
+/* Tombol di navbar right — label disembunyikan di mobile */
+.hapm-navbar-btn {
+  margin-right: 8px;
+}
+.hapm-nav-label {
+  display: inline;
+}
+@media (max-width: 1023px) {
+  .hapm-nav-label { display: none; }
+  .hapm-navbar-btn {
+    padding     : 6px 10px;
+    margin-right: 4px;
+  }
+  .hapm-navbar-btn .material-icons { font-size: 18px; }
+}
+
+/* ============================================================
+   Page content
+   ============================================================ */
+.page-content {
+  background: #f1f5f9;
+}
+
+/* ============================================================
+   Cards
+   ============================================================ */
+.hapm-card {
+  background   : var(--hapm-card-bg);
+  border       : 1px solid var(--hapm-card-border);
+  border-radius: 12px;
+  box-shadow   : var(--hapm-card-shadow);
+  padding      : 20px;
+  margin       : 16px;
+}
+.hapm-card-title {
+  font-size  : 14px;
+  font-weight: 600;
+  color      : #64748b;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.hapm-card-value {
+  font-size  : 28px;
+  font-weight: 700;
+  color      : #1e293b;
+  line-height: 1;
+}
+.hapm-card-sub {
+  font-size: 12px;
+  color    : #94a3b8;
+  margin-top: 4px;
+}
+
+/* Stats grid (legacy — grid sekarang pakai UIkit uk-grid) */
+.hapm-stats-grid {
+  display              : grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap                  : 12px;
+  padding              : 16px;
+}
+
+/* Stat icon box berwarna — tidak tersedia di UIkit/F7 */
+.hapm-stat-icon {
+  width          : 40px;
+  height         : 40px;
+  border-radius  : 10px;
+  display        : flex;
+  align-items    : center;
+  justify-content: center;
+  margin-bottom  : 12px;
+}
+.hapm-stat-icon .material-icons { font-size: 22px; }
+.hapm-stat-icon.blue   { background: rgba(59,130,246,0.12); color: #3b82f6; }
+.hapm-stat-icon.green  { background: rgba(34,197,94,0.12);  color: #22c55e; }
+.hapm-stat-icon.amber  { background: rgba(245,158,11,0.12); color: #f59e0b; }
+.hapm-stat-icon.purple { background: rgba(168,85,247,0.12); color: #a855f7; }
+
+/* ============================================================
+   Status Badge
+   ============================================================ */
+.hapm-badge {
+  display      : inline-flex;
+  align-items  : center;
+  gap          : 4px;
+  padding      : 3px 10px;
+  border-radius: 99px;
+  font-size    : 11px;
+  font-weight  : 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.hapm-badge-dot {
+  width        : 6px;
+  height       : 6px;
+  border-radius: 50%;
+  flex-shrink  : 0;
+}
+
+.hapm-badge-online   { background: rgba(34,197,94,0.12);  color: var(--hapm-status-online); }
+.hapm-badge-online .hapm-badge-dot   { background: var(--hapm-status-online); }
+
+.hapm-badge-offline  { background: rgba(239,68,68,0.12);  color: var(--hapm-status-offline); }
+.hapm-badge-offline .hapm-badge-dot  { background: var(--hapm-status-offline); }
+
+.hapm-badge-unknown  { background: rgba(148,163,184,0.15); color: var(--hapm-status-unknown); }
+.hapm-badge-unknown .hapm-badge-dot  { background: var(--hapm-status-unknown); }
+
+.hapm-badge-pending  { background: rgba(245,158,11,0.12); color: var(--hapm-status-pending); }
+.hapm-badge-pending .hapm-badge-dot  { background: var(--hapm-status-pending); }
+
+.hapm-badge-running  { background: rgba(59,130,246,0.12); color: var(--hapm-status-running); }
+.hapm-badge-running .hapm-badge-dot  { background: var(--hapm-status-running); }
+
+.hapm-badge-success  { background: rgba(34,197,94,0.12);  color: var(--hapm-status-success); }
+.hapm-badge-success .hapm-badge-dot  { background: var(--hapm-status-success); }
+
+.hapm-badge-failed   { background: rgba(239,68,68,0.12);  color: var(--hapm-status-failed); }
+.hapm-badge-failed .hapm-badge-dot   { background: var(--hapm-status-failed); }
+
+.hapm-badge-rolled_back { background: rgba(245,158,11,0.12); color: var(--hapm-status-rolled_back); }
+.hapm-badge-rolled_back .hapm-badge-dot { background: var(--hapm-status-rolled_back); }
+
+/* Service type badge (TCP / HTTP / HTTPS) */
+.hapm-badge-svctype-tcp   { background: rgba(59,130,246,0.12); color: #3b82f6; }
+.hapm-badge-svctype-http  { background: rgba(34,197,94,0.12);  color: #16a34a; }
+.hapm-badge-svctype-https { background: rgba(168,85,247,0.12); color: #9333ea; }
+
+/* Health check type badge */
+.hapm-badge-hc-none       { background: rgba(148,163,184,0.15); color: #64748b; }
+.hapm-badge-hc-tcp        { background: rgba(59,130,246,0.12);  color: #3b82f6; }
+.hapm-badge-hc-http       { background: rgba(34,197,94,0.12);   color: #16a34a; }
+.hapm-badge-hc-https      { background: rgba(168,85,247,0.12);  color: #9333ea; }
+.hapm-badge-hc-ssh        { background: rgba(245,158,11,0.12);  color: #d97706; }
+.hapm-badge-hc-mysql      { background: rgba(99,102,241,0.12);  color: #6366f1; }
+.hapm-badge-hc-postgresql { background: rgba(20,184,166,0.12);  color: #0d9488; }
+.hapm-badge-hc-redis      { background: rgba(239,68,68,0.12);   color: #dc2626; }
+.hapm-badge-hc-custom     { background: rgba(100,116,139,0.12); color: #475569; }
+
+/* HAProxy config preview block */
+.hapm-config-preview {
+  background   : #1e293b;
+  border-radius: 8px;
+  padding      : 12px 16px;
+  margin-bottom: 16px;
+  overflow-x   : auto;
+}
+.hapm-config-preview pre {
+  margin     : 0;
+  font-family: monospace;
+  font-size  : 12px;
+  color      : #94a3b8;
+  line-height: 1.7;
+  white-space: pre;
+}
+
+/* Role badge */
+.hapm-role-badge { border-radius: 4px; padding: 1px 6px; }
+.hapm-role-superadmin { background: rgba(239,68,68,0.15); color: #ef4444; }
+.hapm-role-admin      { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.hapm-role-operator   { background: rgba(59,130,246,0.15); color: #3b82f6; }
+.hapm-role-viewer     { background: rgba(148,163,184,0.15); color: #64748b; }
+
+/* ============================================================
+   Table
+   ============================================================ */
+.hapm-table-wrap {
+  background   : #fff;
+  border-radius: 12px;
+  border       : 1px solid #e2e8f0;
+  margin       : 16px;
+  overflow     : hidden;
+}
+.hapm-table {
+  width          : 100%;
+  border-collapse: collapse;
+  font-size      : 14px;
+}
+.hapm-table thead th {
+  background   : #f8fafc;
+  color        : #64748b;
+  font-weight  : 600;
+  font-size    : 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding      : 12px 16px;
+  text-align   : left;
+  border-bottom: 1px solid #e2e8f0;
+}
+.hapm-table tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+  transition   : background 0.1s;
+}
+.hapm-table tbody tr:last-child { border-bottom: none; }
+.hapm-table tbody tr:hover { background: #f8fafc; }
+.hapm-table td {
+  padding   : 13px 16px;
+  color     : #334155;
+  vertical-align: middle;
+}
+.hapm-table td.hapm-td-mono {
+  font-family: monospace;
+  font-size  : 13px;
+  color      : #475569;
+}
+
+/* Table — name/description cell */
+.hapm-cell-name { font-weight: 600; color: #1e293b; }
+.hapm-cell-sub  { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+
+/* Table — action button group */
+.hapm-table-actions {
+  display    : flex;
+  align-items: center;
+  gap        : 4px;
+}
+
+/* Table — boolean icon */
+.hapm-icon-ok      { color: #22c55e; font-size: 18px !important; vertical-align: middle; }
+.hapm-icon-neutral { color: #94a3b8; font-size: 18px !important; vertical-align: middle; }
+
+/* Table — SSL expiry days */
+.hapm-ssl-days         { font-weight: 600; }
+.hapm-ssl-days.ok      { color: #22c55e; }
+.hapm-ssl-days.warn    { color: #f59e0b; }
+.hapm-ssl-days.danger  { color: #ef4444; }
+
+/* Table — code/tag cell */
+.hapm-code {
+  background   : #f1f5f9;
+  border-radius: 4px;
+  padding      : 2px 6px;
+  font-size    : 12px;
+  font-family  : monospace;
+  white-space  : nowrap;
+  color        : #334155;
+}
+
+/* Table — small font cells (audit IP, detail, etc) */
+.hapm-td-sm   { font-size: 12px; }
+.hapm-td-muted { color: #64748b; }
+
+/* ============================================================
+   List header bar (title + actions)
+   ============================================================ */
+.hapm-list-header {
+  display        : flex;
+  align-items    : center;
+  justify-content: space-between;
+  padding        : 16px 16px 0;
+  gap            : 12px;
+}
+.hapm-list-title {
+  font-size  : 18px;
+  font-weight: 700;
+  color      : #1e293b;
+}
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+.hapm-btn-primary {
+  background  : #3b82f6;
+  color       : #fff;
+  border      : none;
+  border-radius: 8px;
+  padding     : 8px 16px;
+  font-size   : 14px;
+  font-weight : 500;
+  cursor      : pointer;
+  display     : inline-flex;
+  align-items : center;
+  gap         : 6px;
+  transition  : background 0.15s;
+  text-decoration: none;
+}
+.hapm-btn-primary:hover { background: #2563eb; color: #fff; }
+.hapm-btn-primary .material-icons { font-size: 16px; }
+
+.hapm-btn-danger {
+  background: #ef4444;
+  color     : #fff;
+}
+.hapm-btn-danger:hover { background: #dc2626; }
+
+.hapm-btn-outline {
+  background  : transparent;
+  color       : #3b82f6;
+  border      : 1px solid #3b82f6;
+  border-radius: 8px;
+  padding     : 7px 16px;
+  font-size   : 14px;
+  cursor      : pointer;
+  display     : inline-flex;
+  align-items : center;
+  gap         : 6px;
+  transition  : all 0.15s;
+  text-decoration: none;
+}
+.hapm-btn-outline:hover { background: rgba(59,130,246,0.08); }
+
+.hapm-btn-icon {
+  display        : inline-flex;
+  align-items    : center;
+  justify-content: center;
+  width          : 32px;
+  height         : 32px;
+  border-radius  : 6px;
+  cursor         : pointer;
+  background     : transparent;
+  border         : none;
+  color          : #64748b;
+  transition     : background 0.15s, color 0.15s;
+  text-decoration: none;
+}
+.hapm-btn-icon:hover { background: #f1f5f9; color: #1e293b; }
+.hapm-btn-icon.danger:hover { background: rgba(239,68,68,0.1); color: #ef4444; }
+.hapm-btn-icon.hapm-btn-provision { color: #f59e0b; }
+.hapm-btn-icon.hapm-btn-provision:hover { background: rgba(245,158,11,0.1); color: #d97706; }
+.hapm-btn-icon .material-icons { font-size: 18px; }
+
+/* ============================================================
+   Provision Wizard
+   ============================================================ */
+.hapm-provision-sheet { height: auto; max-height: 90vh; }
+
+/* Prasyarat checklist */
+.hapm-provision-checklist {
+  display       : flex;
+  flex-direction: column;
+  gap           : 6px;
+}
+.hapm-provision-check {
+  display    : flex;
+  align-items: flex-start;
+  gap        : 8px;
+  font-size  : 13px;
+  color      : #334155;
+  line-height: 1.5;
+}
+.hapm-provision-check i { flex-shrink: 0; margin-top: 2px; }
+
+/* Steps preview (sebelum running) */
+.hapm-provision-steps-preview {
+  display       : flex;
+  flex-direction: column;
+  gap           : 6px;
+  background    : #f8fafc;
+  border        : 1px solid #e2e8f0;
+  border-radius : 8px;
+  padding       : 12px;
+}
+.hapm-provision-step-preview {
+  display    : flex;
+  align-items: flex-start;
+  gap        : 10px;
+  font-size  : 13px;
+  color      : #475569;
+}
+.hapm-provision-step-num {
+  width          : 20px;
+  height         : 20px;
+  background     : #e2e8f0;
+  border-radius  : 50%;
+  font-size      : 11px;
+  font-weight    : 700;
+  color          : #64748b;
+  display        : flex;
+  align-items    : center;
+  justify-content: center;
+  flex-shrink    : 0;
+}
+
+/* Progress steps (saat running) */
+.hapm-provision-progress-steps {
+  display       : flex;
+  flex-direction: column;
+  gap           : 10px;
+  text-align    : left;
+  max-width     : 340px;
+  margin        : 0 auto;
+}
+.hapm-provision-progress-step {
+  display    : flex;
+  align-items: center;
+  gap        : 10px;
+  padding    : 8px 12px;
+  border-radius: 6px;
+  background : #f8fafc;
+  transition : background 0.3s;
+}
+.hapm-provision-progress-step.active {
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* ============================================================
+   Form styles
+   ============================================================ */
+.hapm-form-section {
+  background   : #fff;
+  border-radius: 12px;
+  border       : 1px solid #e2e8f0;
+  margin       : 16px;
+  overflow     : hidden;
+}
+.hapm-form-section .list {
+  margin: 0;
+}
+
+/* Form submit area */
+.hapm-form-submit {
+  padding: 16px;
+}
+.hapm-form-submit .button {
+  width        : 100%;
+  height       : 44px;
+  border-radius: 8px;
+}
+
+/* Form section title */
+.hapm-form-section-title {
+  font-weight  : 600;
+  color        : #334155;
+  margin-bottom: 8px;
+}
+
+/* ============================================================
+   Sheet modal
+   ============================================================ */
+.hapm-sheet-modal {
+  height: auto;
+}
+.hapm-sheet-content {
+  padding: 20px 16px 16px;
+}
+.hapm-sheet-title {
+  font-size    : 16px;
+  font-weight  : 700;
+  color        : #1e293b;
+  margin-bottom: 16px;
+}
+.hapm-sheet-actions {
+  display: flex;
+  gap    : 8px;
+  margin-top: 16px;
+}
+.hapm-sheet-actions .button {
+  height       : 40px;
+  border-radius: 8px;
+}
+.hapm-sheet-actions .hapm-btn-outline { flex: 1; }
+.hapm-sheet-actions .hapm-btn-primary { flex: 2; }
+
+/* ============================================================
+   Empty state
+   ============================================================ */
+.hapm-empty {
+  display        : flex;
+  flex-direction : column;
+  align-items    : center;
+  justify-content: center;
+  padding        : 60px 20px;
+  color          : #94a3b8;
+  text-align     : center;
+}
+.hapm-empty .material-icons { font-size: 48px; margin-bottom: 12px; }
+.hapm-empty-title { font-size: 16px; font-weight: 600; color: #64748b; }
+.hapm-empty-sub   { font-size: 13px; margin-top: 4px; }
+
+/* ============================================================
+   Loading overlay
+   ============================================================ */
+.hapm-loading {
+  display        : flex;
+  align-items    : center;
+  justify-content: center;
+  padding        : 16px;
+  min-height     : 52px;
+}
+
+.hapm-loading .preloader,
+.hapm-loading .preloader-inner,
+.hapm-loading .preloader svg {
+  width  : 22px !important;
+  height : 22px !important;
+  flex   : none;
+}
+
+.hapm-iscroll-indicator {
+  display         : flex;
+  justify-content : center;
+  padding         : 14px 0 20px;
+}
+
+.hapm-iscroll-indicator::before {
+  content          : '';
+  width            : 26px;
+  height           : 26px;
+  border-radius    : 50%;
+  border           : 2.5px solid rgba(148, 163, 184, 0.35);
+  border-top-color : #3b82f6;
+  animation        : hapm-spin 0.75s linear infinite;
+}
+
+@keyframes hapm-spin { to { transform: rotate(360deg); } }
+
+/* ============================================================
+   Deployment progress steps
+   ============================================================ */
+.hapm-deploy-steps {
+  display       : flex;
+  flex-direction: column;
+  gap           : 8px;
+  padding       : 16px;
+}
+.hapm-deploy-step {
+  display    : flex;
+  align-items: center;
+  gap        : 12px;
+  padding    : 10px 14px;
+  border-radius: 8px;
+  background : #f8fafc;
+  border     : 1px solid #e2e8f0;
+}
+.hapm-deploy-step-icon {
+  width        : 28px;
+  height       : 28px;
+  border-radius: 50%;
+  display      : flex;
+  align-items  : center;
+  justify-content: center;
+  flex-shrink  : 0;
+}
+.hapm-deploy-step-icon .material-icons { font-size: 16px; }
+.hapm-deploy-step.done   .hapm-deploy-step-icon { background: rgba(34,197,94,0.15); color: #22c55e; }
+.hapm-deploy-step.active .hapm-deploy-step-icon { background: rgba(59,130,246,0.15); color: #3b82f6; }
+.hapm-deploy-step.failed .hapm-deploy-step-icon { background: rgba(239,68,68,0.15); color: #ef4444; }
+.hapm-deploy-step.idle   .hapm-deploy-step-icon { background: #f1f5f9; color: #94a3b8; }
+.hapm-deploy-step-label  { font-size: 14px; font-weight: 500; color: #334155; flex: 1; }
+.hapm-deploy-step.idle .hapm-deploy-step-label { color: #94a3b8; }
+
+/* ============================================================
+   Login page
+   ============================================================ */
+.hapm-login-page {
+  /* overlay seluruh viewport termasuk sidebar */
+  position  : fixed !important;
+  inset     : 0 !important;
+  z-index   : 500;
+  background: linear-gradient(135deg, #1a1f2e 0%, #0f172a 100%);
+}
+
+/* item-input-wrap default F7 tidak flex — override agar icon sejajar dengan input */
+.hapm-login-page .item-input-wrap {
+  display    : flex;
+  align-items: center;
+  flex-direction: row;
+  gap        : 4px;
+}
+.hapm-login-page .item-input-wrap input { flex: 1; min-width: 0; }
+
+/* Eye/visibility toggle button di password field */
+.hapm-eye-btn {
+  background   : none;
+  border       : none;
+  cursor       : pointer;
+  padding      : 4px;
+  color        : #94a3b8;
+  display      : flex;
+  align-items  : center;
+  flex-shrink  : 0;
+  border-radius: 4px;
+  transition   : color 0.15s;
+  line-height  : 1;
+}
+.hapm-eye-btn:hover { color: #475569; }
+.hapm-eye-btn .material-icons { font-size: 20px; }
+
+.hapm-login-page .page-content {
+  background     : transparent !important;
+  display        : flex;
+  align-items    : center;
+  justify-content: center;
+  min-height     : 100%;
+  padding        : 24px 16px;
+  box-sizing     : border-box;
+}
+
+.hapm-login-box {
+  background   : #ffffff;
+  border-radius: 16px;
+  padding      : 40px;
+  width        : 100%;
+  max-width    : 400px;
+  margin       : 16px;
+  box-shadow   : 0 20px 60px rgba(0,0,0,0.3);
+}
+.hapm-login-logo {
+  display        : flex;
+  align-items    : center;
+  justify-content: center;
+  gap            : 12px;
+  margin-bottom  : 32px;
+}
+.hapm-login-logo-icon {
+  width        : 48px;
+  height       : 48px;
+  background   : #3b82f6;
+  border-radius: 12px;
+  display      : flex;
+  align-items  : center;
+  justify-content: center;
+  color        : #fff;
+}
+.hapm-login-logo-icon .material-icons { font-size: 28px; }
+.hapm-login-logo-title {
+  font-size  : 22px;
+  font-weight: 800;
+  color      : #1e293b;
+}
+.hapm-login-logo-sub {
+  font-size: 13px;
+  color    : #64748b;
+}
+.hapm-login-title {
+  font-size  : 20px;
+  font-weight: 700;
+  color      : #1e293b;
+  margin-bottom: 4px;
+}
+.hapm-login-sub {
+  font-size    : 13px;
+  color        : #64748b;
+  margin-bottom: 24px;
+}
+
+/* ============================================================
+   Responsive — Mobile overrides
+   ============================================================ */
+@media (max-width: 600px) {
+  .hapm-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .hapm-table thead { display: none; }
+  .hapm-table, .hapm-table tbody, .hapm-table tr, .hapm-table td {
+    display: block;
+    width  : 100%;
+  }
+  .hapm-table tr { border-bottom: 1px solid #e2e8f0; padding: 8px 0; }
+  .hapm-table td {
+    padding    : 4px 16px;
+    border     : none;
+    text-align : left;
+  }
+  .hapm-table td[data-label]::before {
+    content    : attr(data-label) ': ';
+    font-weight: 600;
+    color      : #64748b;
+    font-size  : 11px;
+    text-transform: uppercase;
+    display    : block;
+    margin-bottom: 2px;
+  }
+}
+
+/* ============================================================
+   Searchbar
+   ============================================================ */
+.hapm-searchbar-wrap {
+  padding       : 8px 16px 10px;
+  background    : var(--f7-page-bg-color, #f8fafc);
+  border-bottom : 1px solid rgba(0,0,0,0.06);
+}
+.hapm-searchbar-inner {
+  display       : flex;
+  align-items   : center;
+  gap           : 8px;
+  background    : #fff;
+  border        : 1.5px solid #e2e8f0;
+  border-radius : 10px;
+  padding       : 0 10px;
+  height        : 40px;
+  transition    : border-color 0.15s;
+}
+.hapm-searchbar-inner:focus-within { border-color: #3b82f6; }
+.hapm-searchbar-inner > .material-icons { font-size: 20px; color: #94a3b8; flex-shrink: 0; }
+.hapm-searchbar-input {
+  flex       : 1;
+  border     : none;
+  outline    : none;
+  background : transparent;
+  font-size  : 14px;
+  color      : #1e293b;
+  min-width  : 0;
+}
+.hapm-searchbar-input::placeholder { color: #94a3b8; }
+.hapm-searchbar-clear {
+  display     : flex;
+  align-items : center;
+  color       : #94a3b8;
+  cursor      : pointer;
+  flex-shrink : 0;
+  text-decoration: none;
+}
+.hapm-searchbar-clear:hover { color: #64748b; }
+.hapm-searchbar-clear .material-icons { font-size: 20px; }
+.hapm-search-info {
+  padding   : 6px 16px 2px;
+  font-size : 12px;
+  color     : #94a3b8;
+}
+
+/* ============================================================
+   Infinite Scroll Preloader position
+   ============================================================ */
+.hapm-infinite-end {
+  text-align    : center;
+  padding       : 6px 0 16px;
+  font-size     : 12px;
+  color         : #cbd5e1;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hapm-searchbar-inner { background: #1e293b; border-color: #334155; }
+  .hapm-searchbar-input { color: #e2e8f0; }
+}
+
+/* ============================================================
+   Segmented Tab Selector
+   ============================================================ */
+.hapm-segmented-wrap {
+  padding : 12px 16px 4px;
+}
+.hapm-segmented {
+  display       : flex;
+  background    : #f1f5f9;
+  border-radius : 10px;
+  padding       : 3px;
+  gap           : 2px;
+}
+.hapm-seg-btn {
+  flex           : 1;
+  text-align     : center;
+  padding        : 7px 6px;
+  border-radius  : 7px;
+  font-size      : 12px;
+  font-weight    : 500;
+  color          : #64748b;
+  cursor         : pointer;
+  transition     : all 0.15s;
+  text-decoration: none;
+  white-space    : nowrap;
+}
+.hapm-seg-btn.active {
+  background  : #fff;
+  color       : #1e293b;
+  font-weight : 600;
+  box-shadow  : 0 1px 3px rgba(0,0,0,0.1);
+}
+.hapm-seg-btn:hover:not(.active) { color: #334155; }
+
+/* ── Role badges ─────────────── */
+.hapm-badge-role-superadmin { background: rgba(168,85,247,0.12);  color: #9333ea; }
+.hapm-badge-role-admin      { background: rgba(59,130,246,0.12);   color: #2563eb; }
+.hapm-badge-role-operator   { background: rgba(245,158,11,0.12);   color: #d97706; }
+.hapm-badge-role-viewer     { background: rgba(100,116,139,0.12);  color: #475569; }
+
+/* ── Member row ──────────────── */
+.hapm-member-row {
+  display         : flex;
+  align-items     : center;
+  justify-content : space-between;
+  padding         : 10px 0;
+  border-bottom   : 1px solid #f1f5f9;
+}
+.hapm-member-row:last-child { border-bottom: none; }
+
+@media (prefers-color-scheme: dark) {
+  .hapm-segmented    { background: #1e293b; }
+  .hapm-seg-btn.active { background: #273548; }
+  .hapm-member-row   { border-bottom-color: #1e293b; }
+}
+
+/* ============================================================
+   Backend Protocol & SSL Mode Badges
+   ============================================================ */
+
+/* Protocol */
+.hapm-badge-proto-http  { background: rgba(34,197,94,0.12);  color: #16a34a; }
+.hapm-badge-proto-https { background: rgba(168,85,247,0.12); color: #9333ea; }
+.hapm-badge-proto-tcp   { background: rgba(59,130,246,0.12); color: #3b82f6; }
+
+/* Backup server */
+.hapm-badge-backup { background: rgba(245,158,11,0.12); color: #d97706; font-size: 10px; padding: 1px 5px; }
+
+/* SSL mode */
+.hapm-badge-ssl-trusted    { background: rgba(20,184,166,0.12); color: #0d9488; }
+.hapm-badge-ssl-self-signed { background: rgba(245,158,11,0.12); color: #d97706; }
+
+/* Muted dash for n/a cells */
+.hapm-cell-muted { color: #cbd5e1; font-size: 13px; }
+
+/* Server count chip */
+.hapm-srv-count {
+  display     : inline-flex;
+  align-items : center;
+  gap         : 3px;
+  font-size   : 13px;
+  color       : #475569;
+  font-weight : 500;
+}
+
+/* ── Dark mode ── */
+@media (prefers-color-scheme: dark) {
+  .hapm-cell-muted  { color: #475569; }
+  .hapm-srv-count   { color: #94a3b8; }
+}
+
+/* ============================================================
+   Warning Banner (self-signed info)
+   ============================================================ */
+.hapm-warn-banner {
+  display       : flex;
+  align-items   : flex-start;
+  gap           : 8px;
+  padding       : 10px 12px;
+  margin-top    : 10px;
+  background    : rgba(245,158,11,0.1);
+  border        : 1px solid rgba(245,158,11,0.3);
+  border-radius : 8px;
+  font-size     : 12px;
+  color         : #92400e;
+  line-height   : 1.4;
+}
+.hapm-warn-banner .material-icons {
+  font-size   : 16px;
+  margin-top  : 1px;
+  color       : #d97706;
+  flex-shrink : 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hapm-warn-banner {
+    background : rgba(245,158,11,0.08);
+    border-color: rgba(245,158,11,0.2);
+    color: #fbbf24;
+  }
+  .hapm-warn-banner .material-icons { color: #fbbf24; }
+}
+
+/* ============================================================
+   Server Cards (backends-form)
+   ============================================================ */
+.hapm-srv-card {
+  margin        : 8px 16px;
+  padding       : 14px;
+  border        : 1px solid #e2e8f0;
+  border-radius : 10px;
+  background    : #fff;
+}
+.hapm-srv-header {
+  display         : flex;
+  justify-content : space-between;
+  align-items     : center;
+  margin-bottom   : 12px;
+  padding-bottom  : 10px;
+  border-bottom   : 1px solid #f1f5f9;
+}
+.hapm-srv-title {
+  display     : flex;
+  align-items : center;
+  gap         : 5px;
+  font-size   : 13px;
+  font-weight : 600;
+  color       : #334155;
+}
+.hapm-srv-row {
+  display : flex;
+  gap     : 12px;
+  margin-bottom: 10px;
+}
+.hapm-srv-field {
+  display        : flex;
+  flex-direction : column;
+  gap            : 3px;
+}
+.hapm-srv-label {
+  font-size   : 11px;
+  font-weight : 500;
+  color       : #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.hapm-srv-input {
+  border        : 1px solid #e2e8f0;
+  border-radius : 6px;
+  padding       : 6px 8px;
+  font-size     : 13px;
+  color         : #1e293b;
+  background    : #f8fafc;
+  width         : 100%;
+  box-sizing    : border-box;
+  outline       : none;
+  transition    : border-color 0.15s;
+}
+.hapm-srv-input:focus { border-color: #6366f1; background: #fff; }
+
+.hapm-srv-toggles {
+  display         : flex;
+  justify-content : space-between;
+  padding-top     : 10px;
+  border-top      : 1px solid #f1f5f9;
+  margin-top      : 4px;
+}
+.hapm-srv-toggle-item {
+  display     : flex;
+  align-items : center;
+  gap         : 8px;
+}
+.hapm-srv-toggle-label {
+  font-size : 12px;
+  color     : #64748b;
+}
+
+/* ── Dark mode ── */
+@media (prefers-color-scheme: dark) {
+  .hapm-srv-card    { background: #1e293b; border-color: #334155; }
+  .hapm-srv-title   { color: #cbd5e1; }
+  .hapm-srv-input   { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+  .hapm-srv-input:focus { border-color: #818cf8; background: #1e293b; }
+  .hapm-srv-toggles { border-top-color: #334155; }
+  .hapm-srv-toggle-label { color: #94a3b8; }
+  .hapm-srv-label   { color: #64748b; }
+}
+
+/* ── Field hint (protocol/ssl desc) ── */
+.hapm-field-hint {
+  font-size   : 12px;
+  color       : #94a3b8;
+  line-height : 1.4;
+}
+@media (prefers-color-scheme: dark) {
+  .hapm-field-hint { color: #64748b; }
+}
