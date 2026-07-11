@@ -1081,7 +1081,6 @@ CMC_CHALLENGE_ADDR=<ip:port>                   # IP:port HAPM yg bisa diakses in
 ```env
 APP_PORT=8080
 APP_MODE=production
-APP_DB_PATH=/data/hapm.db
 APP_JWT_ACCESS_EXPIRY=15m
 APP_JWT_REFRESH_EXPIRY=168h
 APP_LOG_LEVEL=info

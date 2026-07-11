@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"path/filepath"
 	"os"
+	"path/filepath"
 
 	"github.com/aefw/hapm/internal/config"
 	_ "modernc.org/sqlite"
@@ -23,11 +23,6 @@ type DB struct {
 //   - Performa write lebih baik untuk workload HAPM
 //   - Crash-safe dengan journal mode WAL
 func NewDB(cfg *config.Config) (*DB, error) {
-	// Tolak path relatif — database HARUS di path absolut supaya tersimpan di volume
-	if !filepath.IsAbs(cfg.DB.Path) {
-		return nil, fmt.Errorf("[SQLite] APP_DB_PATH harus path absolut, dapat: %q — set APP_DB_PATH=/data/hapm.db", cfg.DB.Path)
-	}
-
 	// Pastikan direktori database ada
 	dir := filepath.Dir(cfg.DB.Path)
 	if err := os.MkdirAll(dir, 0750); err != nil {

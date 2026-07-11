@@ -111,7 +111,7 @@ func Load() (*Config, error) {
 
 	// Database
 	cfg.DB.Driver = getEnv("APP_DB_DRIVER", "sqlite")
-	cfg.DB.Path = getEnv("APP_DB_PATH", "/data/hapm.db")
+	cfg.DB.Path = detectDBPath()
 	cfg.DB.DSN = getEnv("APP_DB_DSN", "")
 	cfg.DB.MaxOpenConns = getEnvInt("APP_DB_MAX_OPEN_CONNS", 25)
 	cfg.DB.MaxIdleConns = getEnvInt("APP_DB_MAX_IDLE_CONNS", 5)
@@ -177,6 +177,25 @@ func Get() *Config {
 // IsProduction mengembalikan true jika mode production
 func (c *Config) IsProduction() bool {
 	return c.App.Mode == "production"
+}
+
+// detectDBPath menentukan path SQLite secara otomatis tanpa perlu konfigurasi env.
+// Urutan prioritas:
+//  1. APP_DB_PATH — jika diset eksplisit, gunakan itu
+//  2. /data/hapm.db — path volume Docker (jika /data tersedia)
+//  3. ./data/hapm.db — direktori data lokal (jika ./data ada)
+//  4. ./hapm.db — fallback current working directory
+func detectDBPath() string {
+	if v := os.Getenv("APP_DB_PATH"); v != "" {
+		return v
+	}
+	if _, err := os.Stat("/data"); err == nil {
+		return "/data/hapm.db"
+	}
+	if _, err := os.Stat("./data"); err == nil {
+		return "./data/hapm.db"
+	}
+	return "./hapm.db"
 }
 
 // ─── helpers ───────────────────────────────────────────────────────────────
