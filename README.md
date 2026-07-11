@@ -113,6 +113,14 @@ git pull
 docker compose up -d --build
 ```
 
+atau
+
+```bash
+git pull
+docker compose build --no-cache
+docker compose up -d
+```
+
 > **JANGAN gunakan `docker compose down -v`** — flag `-v` menghapus volume dan seluruh data.
 > Gunakan `docker compose up -d --build` (satu perintah) agar volume tetap terjaga.
 
