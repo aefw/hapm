@@ -105,15 +105,22 @@ func (s *distributionService) deployToNode(ctx context.Context, d *domain.CertDe
 		PrivateKey: privKey,
 	}
 
-	// Simpan certificate di node: /etc/haproxy/certs/<uuid>.pem
+	// Upload ke /tmp dulu (user-writable), lalu sudo mv ke /etc/haproxy/certs/
+	// karena direktori certs/ dimiliki root (700) dan tidak bisa ditulis langsung via SCP.
 	destPath := fmt.Sprintf("/etc/haproxy/certs/%s.pem", cert.UUID)
-	if err := s.ssh.UploadFile(ctx, conn, []byte(bundle), destPath); err != nil {
-		_ = s.deployRepo.UpdateStatus(ctx, d.UUID, string(domain.DeployStatusFailed), fmt.Sprintf("upload gagal: %v", err))
+	tmpPath  := fmt.Sprintf("/tmp/hapm_cert_%s.pem", cert.UUID)
+	if err := s.ssh.UploadFile(ctx, conn, []byte(bundle), tmpPath); err != nil {
+		_ = s.deployRepo.UpdateStatus(ctx, d.UUID, string(domain.DeployStatusFailed), fmt.Sprintf("upload cert ke /tmp gagal: %v", err))
 		return
 	}
 
-	// Set permission
-	_, _ = s.ssh.RunCommand(ctx, conn, "chmod 600 "+destPath)
+	// Pastikan direktori certs ada, lalu pindahkan dan set permission
+	mvCmd := fmt.Sprintf("sudo mkdir -p /etc/haproxy/certs && sudo mv %s %s && sudo chmod 600 %s", tmpPath, destPath, destPath)
+	if _, err := s.ssh.RunCommand(ctx, conn, mvCmd); err != nil {
+		_, _ = s.ssh.RunCommand(ctx, conn, "rm -f "+tmpPath)
+		_ = s.deployRepo.UpdateStatus(ctx, d.UUID, string(domain.DeployStatusFailed), fmt.Sprintf("pindah cert ke /etc/haproxy/certs/ gagal (pastikan sudo NOPASSWD): %v", err))
+		return
+	}
 
 	// Graceful reload HAProxy (tidak restart)
 	if out, err := s.ssh.RunCommand(ctx, conn, "haproxy -sf $(cat /var/run/haproxy.pid) || systemctl reload haproxy || service haproxy reload"); err != nil {
