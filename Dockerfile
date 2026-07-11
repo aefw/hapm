@@ -41,10 +41,6 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 # Binary hasil build
 COPY --from=builder /build/hapm /hapm
 
-# Direktori data untuk SQLite database (akan di-mount sebagai volume)
-# scratch tidak punya mkdir, tapi Docker akan membuat path via VOLUME
-VOLUME ["/data"]
-
 # Port default aplikasi
 EXPOSE 8080
 

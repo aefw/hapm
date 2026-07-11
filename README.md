@@ -92,13 +92,59 @@ Login dengan:
 
 ### Update / Upgrade
 
+**Langkah yang aman:**
+
+**1. Backup data dulu (wajib sebelum upgrade)**
+
 ```bash
-git pull
-docker compose build --no-cache
-docker compose up -d
+docker run --rm \
+  -v hapm_data:/data \
+  -v $(pwd):/backup \
+  alpine \
+  tar czf /backup/hapm_backup_$(date +%Y%m%d_%H%M%S).tar.gz -C / data
 ```
 
-Data tidak akan hilang — database tersimpan di Docker volume `hapm_data`.
+File backup akan tersimpan di direktori repo dengan nama `hapm_backup_YYYYMMDD_HHMMSS.tar.gz`.
+
+**2. Upgrade aplikasi**
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+> **JANGAN gunakan `docker compose down -v`** — flag `-v` menghapus volume dan seluruh data.
+> Gunakan `docker compose up -d --build` (satu perintah) agar volume tetap terjaga.
+
+Data tidak akan hilang — database SQLite dan certificate tersimpan di Docker volume `hapm_data`.
+
+---
+
+### Recovery jika data hilang setelah upgrade
+
+Jika data terlanjur hilang, cek apakah volume lama masih ada:
+
+```bash
+# Lihat semua volume
+docker volume ls | grep hapm
+
+# Jika ada volume lama (misal: haproxy-manager_hapm_data), restore dari sana:
+docker run --rm \
+  -v <nama_volume_lama>:/source \
+  -v hapm_data:/dest \
+  alpine \
+  sh -c "cp -a /source/. /dest/"
+```
+
+Jika ada file backup tar.gz:
+
+```bash
+docker run --rm \
+  -v hapm_data:/data \
+  -v $(pwd):/backup \
+  alpine \
+  tar xzf /backup/hapm_backup_YYYYMMDD_HHMMSS.tar.gz -C /
+```
 
 ---
 
