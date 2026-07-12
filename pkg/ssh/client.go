@@ -138,7 +138,9 @@ func (c *sshClient) RunCommand(ctx context.Context, conn *Connection, cmd string
 			if errMsg == "" {
 				errMsg = err.Error()
 			}
-			return "", fmt.Errorf("ssh: run command %q: %s", cmd, errMsg)
+			// Kembalikan stdout meskipun command gagal; banyak tools (haproxy -c, apt-get, dll.)
+			// menulis diagnostic ke stdout, dan caller perlu output ini untuk error reporting.
+			return strings.TrimSpace(stdout.String()), fmt.Errorf("ssh: run command %q: %s", cmd, errMsg)
 		}
 	case <-runCtx.Done():
 		sess.Signal(gossh.SIGTERM) //nolint:errcheck

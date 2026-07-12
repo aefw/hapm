@@ -147,35 +147,46 @@ func (g *generator) Generate(
 	sb.WriteString("    server acme_local 127.0.0.1:8888\n\n")
 
 	// ── HTTP frontend (port 80) ──
+	// Urutan HAProxy yang benar: acl → http-request → use_backend
 	sb.WriteString("frontend http_in\n")
 	sb.WriteString("    bind *:80\n")
 	sb.WriteString("    mode http\n")
-	// ACME challenge: exempt dari redirect, teruskan ke backend lokal
 	sb.WriteString("    acl is_acme_challenge path_beg /.well-known/acme-challenge/\n")
-	sb.WriteString("    use_backend acme_challenge if is_acme_challenge\n")
 
-	// Cloudflare real IP extraction jika node di belakang Cloudflare
+	// ACL per-domain untuk redirect dan auth
+	for _, d := range domains {
+		if !d.Enabled {
+			continue
+		}
+		if d.SSLMode == domain.SSLModeTerminate && d.HTTPRedirect {
+			aclName := "host_redir_" + sanitizeName(d.DomainName)
+			sb.WriteString(fmt.Sprintf("    acl %s hdr(host) -i %s\n", aclName, d.DomainName))
+		}
+		if d.AuthGroupID != nil && d.SSLMode != domain.SSLModePassthrough {
+			if _, ok := groupUserlistName[*d.AuthGroupID]; ok {
+				aclName := "host_auth_" + sanitizeName(d.DomainName)
+				sb.WriteString(fmt.Sprintf("    acl %s hdr(host) -i %s\n", aclName, d.DomainName))
+			}
+		}
+	}
+
+	// Cloudflare real IP extraction
 	if node.BehindCloudflare {
-		sb.WriteString("    # Ekstrak real client IP dari header Cloudflare\n")
 		sb.WriteString("    http-request set-header X-Real-IP %[req.hdr(CF-Connecting-IP)] if { req.hdr(CF-Connecting-IP) -m found }\n")
 	}
 
-	// Redirect HTTP→HTTPS per-domain (hanya domain yang punya SSL + http_redirect=true)
+	// Redirect HTTP→HTTPS per-domain
 	for _, d := range domains {
 		if !d.Enabled || d.SSLMode != domain.SSLModeTerminate || !d.HTTPRedirect {
 			continue
 		}
 		aclName := "host_redir_" + sanitizeName(d.DomainName)
-		sb.WriteString(fmt.Sprintf("    acl %s hdr(host) -i %s\n", aclName, d.DomainName))
 		sb.WriteString(fmt.Sprintf("    http-request redirect scheme https code 301 if %s !is_acme_challenge\n", aclName))
 	}
 
-	// Basic Auth per-domain pada HTTP frontend (jika domain punya auth group)
+	// Basic Auth per-domain
 	for _, d := range domains {
-		if !d.Enabled || d.AuthGroupID == nil {
-			continue
-		}
-		if d.SSLMode == domain.SSLModePassthrough {
+		if !d.Enabled || d.AuthGroupID == nil || d.SSLMode == domain.SSLModePassthrough {
 			continue
 		}
 		ulName, ok := groupUserlistName[*d.AuthGroupID]
@@ -184,11 +195,11 @@ func (g *generator) Generate(
 		}
 		aclName := "host_auth_" + sanitizeName(d.DomainName)
 		realm := sanitizeName(d.DomainName)
-		sb.WriteString(fmt.Sprintf("    acl %s hdr(host) -i %s\n", aclName, d.DomainName))
 		sb.WriteString(fmt.Sprintf("    http-request auth realm %s if %s !{ http_auth(%s) }\n", realm, aclName, ulName))
 	}
 
-	// Routing via hosts.map — satu directive untuk semua domain HTTP-only
+	// use_backend setelah semua http-request rules (urutan benar untuk HAProxy)
+	sb.WriteString("    use_backend acme_challenge if is_acme_challenge\n")
 	sb.WriteString("    use_backend %[req.hdr(host),lower,map(/etc/haproxy/map/hosts)] if !is_acme_challenge\n")
 	sb.WriteString("\n")
 
@@ -407,7 +418,7 @@ func (v *validator) Validate(ctx context.Context, conn *ssh.Connection, configCo
 		return false, "", fmt.Errorf("validator: upload config: %w", err)
 	}
 
-	output, err := v.sshClient.RunCommand(ctx, conn, fmt.Sprintf("haproxy -c -f %s 2>&1", tmpPath))
+	output, err := v.sshClient.RunCommand(ctx, conn, fmt.Sprintf("sudo haproxy -c -f %s 2>&1", tmpPath))
 	if err != nil {
 		return false, output, nil
 	}
