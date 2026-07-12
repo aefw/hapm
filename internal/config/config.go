@@ -79,7 +79,7 @@ type CMCConfig struct {
 	// ACMEServiceURL: URL internal hapm-acme service
 	ACMEServiceURL string
 	// ChallengeAddr: alamat IP:port yang bisa diakses HAProxy node untuk HTTP-01 challenge
-	// Contoh: "203.0.113.10:8080" (IP publik HAPM Controller)
+	// Contoh: "203.0.113.10:8282" (IP publik HAPM Controller)
 	ChallengeAddr string
 }
 
@@ -102,8 +102,8 @@ func Load() (*Config, error) {
 	// App
 	cfg.App.Name = getEnv("APP_NAME", "HAProxy Manager")
 	cfg.App.Mode = getEnv("APP_MODE", "production")
-	cfg.App.BaseURL = getEnv("APP_BASE_URL", "http://localhost:8080")
-	port, err := strconv.Atoi(getEnv("APP_PORT", "8080"))
+	cfg.App.BaseURL = getEnv("APP_BASE_URL", "http://localhost:8282")
+	port, err := strconv.Atoi(getEnv("APP_PORT", "8282"))
 	if err != nil {
 		return nil, fmt.Errorf("[CONFIG] APP_PORT tidak valid: %v", err)
 	}

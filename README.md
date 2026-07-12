@@ -29,7 +29,7 @@
 
 - Docker ≥ 24.x
 - Docker Compose v2 (`docker compose`, bukan `docker-compose`)
-- Port 8080 tersedia di server
+- Port 8282 tersedia di server
 
 ### Langkah Instalasi
 
@@ -78,14 +78,14 @@ docker compose up -d
 Buka browser dan akses:
 
 ```
-http://<IP-SERVER>:8080
+http://<IP-SERVER>:8282
 ```
 
 Login dengan:
 - **Username:** `admin`
 - **Password:** `admin`
 
-> Ganti password segera setelah login pertama melalui menu **Settings → Profile**.
+> Ganti password segera setelah login pertama melalui menu **Settings → Password**.
 
 ---
 
@@ -159,7 +159,7 @@ docker run --rm \
 
 | Port | Keterangan |
 |---|---|
-| `8080` | HAPM UI + API (expose ke host) |
+| `8282` | HAPM UI + API (expose ke host) |
 | `8889` | hapm-acme ACME worker (internal Docker network, tidak di-expose) |
 
 ---
@@ -292,7 +292,7 @@ No domain imports anything external.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  HAPM (hapm container, port 8080)                               │
+│  HAPM (hapm container, port 8282)                               │
 │                                                                 │
 │  SchedulerService ──(every 24h)──▶ CertificateService          │
 │  CertificateService ──HTTP──▶ hapm-acme (internal network)     │
@@ -305,7 +305,7 @@ No domain imports anything external.
 │                                                                 │
 │  LEGO CLI (v4.17.4) ──DNS-01──▶ Cloudflare API                │
 │                    ──HTTP-01──▶ .well-known/acme-challenge/     │
-│                                  (served by HAPM on :8080)     │
+│                                  (served by HAPM on :8282)     │
 └─────────────────────────────────────────────────────────────────┘
          │ shared volume (hapm_data:/data)
          ▼
@@ -763,7 +763,7 @@ backend hapm_acme_backend
     server hapm-controller <CMC_CHALLENGE_ADDR>
 ```
 
-Set `CMC_CHALLENGE_ADDR` ke IP:PORT HAPM controller yang dapat dijangkau dari internet (contoh: `203.0.113.10:8080`).
+Set `CMC_CHALLENGE_ADDR` ke IP:PORT HAPM controller yang dapat dijangkau dari internet (contoh: `203.0.113.10:8282`).
 
 ### DNS-01 (Cloudflare) Setup
 
@@ -1074,7 +1074,7 @@ Viewer     → read-only
 
 ```yaml
 services:
-  hapm:         # HAPM API Server + frontend, port 8080
+  hapm:         # HAPM API Server + frontend, port 8282
   hapm-acme:    # ACME worker (LEGO CLI), internal only port 8889
 ```
 
@@ -1111,7 +1111,7 @@ CMC_CHALLENGE_ADDR=<ip:port>                   # IP:port HAPM yg bisa diakses in
 
 **Opsional:**
 ```env
-APP_PORT=8080
+APP_PORT=8282
 APP_MODE=production
 APP_JWT_ACCESS_EXPIRY=15m
 APP_JWT_REFRESH_EXPIRY=168h
@@ -1204,7 +1204,7 @@ docker compose up -d
 - [x] Makefile (termasuk `build-frontend`, `build-all`)
 - [x] Health check endpoint (`-health` flag)
 - [x] Graceful shutdown (SIGINT/SIGTERM)
-- [x] Docker: single binary scratch image, serve UI + API pada port 8080
+- [x] Docker: single binary scratch image, serve UI + API pada port 8282
 
 ### Sprint 10 — HTTPS Frontend Control + Auto Cert Push ✅
 - [x] Migration v33: kolom `https_frontend_enabled` pada tabel `nodes`

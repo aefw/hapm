@@ -20,7 +20,7 @@ services:
     restart: unless-stopped
 
     ports:
-      - "${APP_PORT:-8080}:8080"
+      - "${APP_PORT:-8282}:8282"
 
     volumes:
       - hapm_data:/data
@@ -29,8 +29,8 @@ services:
       # App
       APP_NAME: ${APP_NAME:-HAProxy Manager}
       APP_MODE: ${APP_MODE:-production}
-      APP_PORT: "8080"
-      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
+      APP_PORT: "8282"
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8282}
 
       # Database
       APP_DB_DRIVER: ${APP_DB_DRIVER:-sqlite}
@@ -61,7 +61,7 @@ services:
       CMC_WEBROOT_PATH: /data/acme-webroot
       CMC_ACME_SERVICE_URL: http://hapm-acme:8889
       # CMC_CHALLENGE_ADDR: IP:PORT yang bisa diakses HAProxy node untuk HTTP-01
-      # Contoh: CMC_CHALLENGE_ADDR=203.0.113.10:8080
+      # Contoh: CMC_CHALLENGE_ADDR=203.0.113.10:8282
       CMC_CHALLENGE_ADDR: ${CMC_CHALLENGE_ADDR:-}
 
     depends_on:

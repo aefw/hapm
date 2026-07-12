@@ -161,7 +161,7 @@ docker-build: ## Build Docker image
 
 docker-up: ## Jalankan semua service via Docker Compose
 	docker compose up -d
-	@echo "$(GREEN)✓ HAPM berjalan di http://localhost:$${APP_PORT:-8080}$(NC)"
+	@echo "$(GREEN)✓ HAPM berjalan di http://localhost:$${APP_PORT:-8282}$(NC)"
 
 docker-down: ## Hentikan semua service Docker
 	docker compose down
