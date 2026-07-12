@@ -21,9 +21,14 @@ import (
 )
 
 func main() {
-	// Health check flag
-	if len(os.Args) > 1 && os.Args[1] == "-health" {
-		os.Exit(0)
+	// Subcommands CLI
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "-health":
+			os.Exit(0)
+		case "reset-password":
+			runResetPassword(os.Args[2:])
+		}
 	}
 
 	// ─── 1. Load konfigurasi dari environment ──────────────────────

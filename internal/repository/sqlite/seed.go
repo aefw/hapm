@@ -4,16 +4,13 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/aefw/hapm/internal/security"
 )
 
-const defaultAdminPassword = "admin"
-
 // Seed membuat SuperAdmin jika belum ada user di database.
-// Password default bisa di-override via APP_ADMIN_DEFAULT_PASSWORD.
-// Password TIDAK di-print ke log — gunakan kredensial default atau yang di-set di env.
+// Kredensial awal: username=admin, password=admin.
+// Pengguna wajib mengganti password setelah login pertama.
 func Seed(db *sql.DB) error {
 	var count int
 	if err := db.QueryRow("SELECT COUNT(*) FROM users").Scan(&count); err != nil {
@@ -24,15 +21,7 @@ func Seed(db *sql.DB) error {
 		return nil
 	}
 
-	// Ambil password dari env, fallback ke default
-	password := os.Getenv("APP_ADMIN_DEFAULT_PASSWORD")
-	usingDefault := false
-	if password == "" {
-		password = defaultAdminPassword
-		usingDefault = true
-	}
-
-	hashed, err := security.HashPassword(password)
+	hashed, err := security.HashPassword("admin")
 	if err != nil {
 		return fmt.Errorf("seed: gagal hash password: %v", err)
 	}
@@ -47,13 +36,7 @@ func Seed(db *sql.DB) error {
 	}
 
 	log.Println("========================================================")
-	log.Println("[SEED] SuperAdmin dibuat: username=admin")
-	if usingDefault {
-		log.Println("[SEED] Password: gunakan password default (lihat dokumentasi)")
-		log.Println("[SEED] WAJIB set APP_ADMIN_DEFAULT_PASSWORD di production!")
-	} else {
-		log.Println("[SEED] Password: dari APP_ADMIN_DEFAULT_PASSWORD")
-	}
+	log.Println("[SEED] SuperAdmin dibuat: username=admin / password=admin")
 	log.Println("[SEED] Ganti password segera setelah login pertama!")
 	log.Println("========================================================")
 

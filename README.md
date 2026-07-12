@@ -56,16 +56,13 @@ Nilai yang **wajib** diisi (generate masing-masing, jangan pakai contoh di bawah
 
 ```env
 # Generate dengan: openssl rand -hex 32
-APP_ENCRYPTION_KEY=ganti_dengan_64_karakter_hex_acak
-
-# Generate dengan: openssl rand -hex 32
 APP_JWT_ACCESS_SECRET=ganti_dengan_64_karakter_hex_acak
 
 # Generate dengan: openssl rand -hex 32
 APP_JWT_REFRESH_SECRET=ganti_dengan_64_karakter_hex_acak
 
-# Password login pertama kali (ubah setelah login)
-APP_ADMIN_DEFAULT_PASSWORD=ganti_dengan_password_kuat
+# Generate dengan: openssl rand -hex 32
+APP_ENCRYPTION_KEY=ganti_dengan_64_karakter_hex_acak
 ```
 
 > Untuk generate secret, jalankan: `openssl rand -hex 32`
@@ -86,7 +83,9 @@ http://<IP-SERVER>:8080
 
 Login dengan:
 - **Username:** `admin`
-- **Password:** sesuai `APP_ADMIN_DEFAULT_PASSWORD` di `.env`
+- **Password:** `admin`
+
+> Ganti password segera setelah login pertama melalui menu **Settings → Profile**.
 
 ---
 
@@ -181,6 +180,34 @@ docker compose restart hapm
 **Status container:**
 ```bash
 docker compose ps
+```
+
+**Reset password admin (jika tidak bisa login):**
+
+Jalankan dari host (Docker):
+```bash
+docker exec hapm /hapm reset-password
+```
+
+Atau dengan password custom:
+```bash
+docker exec hapm /hapm reset-password admin passwordbaru
+```
+
+Format: `reset-password [username] [password]`
+- Jika tanpa argumen: reset `admin` ke password `admin`
+- Unlock akun otomatis jika terkunci
+- Semua session aktif dicabut
+
+Contoh output:
+```
+========================================================
+ Password berhasil di-reset
+ Username : admin
+ Password : admin
+ Akun di-unlock, semua session lama dicabut.
+ Ganti password segera setelah login!
+========================================================
 ```
 
 ---
@@ -341,7 +368,7 @@ Response list:
 
 ```
 Username: admin
-Password: admin   (override via APP_ADMIN_DEFAULT_PASSWORD)
+Password: admin
 ```
 
 ---
@@ -1074,7 +1101,6 @@ hapm_data:/data
 APP_ENCRYPTION_KEY=<32-byte-hex>         # untuk encrypt SSH key + Cloudflare token
 APP_JWT_ACCESS_SECRET=<random-64-char>
 APP_JWT_REFRESH_SECRET=<random-64-char>
-APP_ADMIN_DEFAULT_PASSWORD=<kuat>
 ```
 
 **CMC:**
