@@ -803,9 +803,49 @@ Set `CMC_CHALLENGE_ADDR` ke IP:PORT HAPM controller yang dapat dijangkau dari in
 - Berjalan pertama kali saat startup, lalu setiap **24 jam**
 - Mencari certificate dengan `expires_at - renew_before days <= NOW()` dan `auto_renew=1`
 - Untuk setiap cert yang perlu diperbarui:
-  1. Panggil `CertificateService.Renew()` (async job)
-  2. Tunggu 5 menit
-  3. Panggil `DistributionService.DistributeToAll()` untuk mendistribusi cert baru
+  1. Panggil `CertificateService.Renew()` yang membuat renewal job (async via goroutine)
+  2. Poll status job setiap **15 detik** hingga job selesai (timeout 10 menit)
+  3. Jika renewal **berhasil** → panggil `DistributionService.DistributeToAll()` untuk mendistribusi cert baru ke semua node dan reload HAProxy
+  4. Jika renewal **gagal** → distribusi dibatalkan, status cert berubah ke `error`
+
+> Distribusi hanya dijalankan jika renewal berhasil (status job = `success`). Sebelumnya ada bug race condition di mana distribusi selalu dijalankan setelah sleep 5 menit tanpa memeriksa hasil renewal.
+
+### Alert Endpoint
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/api/v1/alerts` | Auth | Daftar alert aktif terkait SSL certificate |
+
+**Response:**
+```json
+{
+  "count": 2,
+  "items": [
+    {
+      "type": "cert_error",
+      "title": "SSL Gagal Diperbarui",
+      "message": "Certificate '*.example.com' mengalami error: ...",
+      "cert_uuid": "...",
+      "cert_name": "*.example.com",
+      "since": "2025-01-01T00:00:00Z"
+    },
+    {
+      "type": "cert_dist_failed",
+      "title": "Distribusi SSL Gagal",
+      "message": "Distribusi SSL ke node 'web-01' gagal: ...",
+      "cert_uuid": "...",
+      "node_name": "web-01",
+      "since": "2025-01-01T00:00:00Z"
+    }
+  ]
+}
+```
+
+**Tipe alert:**
+- `cert_error` — certificate dengan `status = 'error'` (renewal atau issue gagal); perlu intervensi manual
+- `cert_dist_failed` — distribusi cert ke node gagal dalam 7 hari terakhir; cert sudah diperbarui tapi belum terkirim ke node tersebut
+
+Frontend dapat polling endpoint ini untuk menampilkan badge notifikasi. Alert hilang otomatis setelah masalah teratasi (cert kembali ke `active` / distribusi berhasil).
 
 ---
 

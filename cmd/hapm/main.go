@@ -94,7 +94,7 @@ func main() {
 	certSvc := service.NewCertificateService(cfg, certRepo, certJobRepo, settingsSvc, acmeClient, certStore, auditSvc)
 	certJobSvc := service.NewCertJobService(certJobRepo)
 	distSvc := service.NewDistributionService(cfg, certRepo, certDeployRepo, nodeRepo, certStore, sshClient, auditSvc)
-	schedulerSvc := service.NewSchedulerService(certRepo, certSvc, distSvc)
+	schedulerSvc := service.NewSchedulerService(certRepo, certJobRepo, certSvc, distSvc)
 	configSvc := service.NewConfigService(nodeRepo, backendRepo, domainRepo, certRepo, serviceRepo, authGroupRepo, haproxyGen)
 	serviceSvc := service.NewServiceService(serviceRepo, backendRepo, auditSvc)
 	revisionSvc := service.NewRevisionService(revisionRepo, auditSvc)
@@ -147,6 +147,7 @@ func main() {
 	handler.RegisterServiceRoutes(router, cfg, serviceSvc)
 	handler.RegisterDashboardRoutes(router, cfg, dashboardSvc)
 	handler.RegisterHAProxyAuthRoutes(router, cfg, authUserSvc, authGroupSvc)
+	handler.RegisterAlertRoutes(router, cfg, certRepo, certDeployRepo)
 
 	// ─── 8. Jalankan scheduler CMC ─────────────────────────────────
 	ctx := context.Background()

@@ -12,6 +12,7 @@ import (
 // Berjalan setiap 24 jam untuk memeriksa dan memperbarui certificate yang akan expired.
 type schedulerService struct {
 	certRepo    domain.CertificateRepository
+	certJobRepo domain.CertJobRepository
 	certSvc     domain.CertificateService
 	distSvc     domain.DistributionService
 	stopCh      chan struct{}
@@ -19,14 +20,16 @@ type schedulerService struct {
 
 func NewSchedulerService(
 	certRepo domain.CertificateRepository,
+	certJobRepo domain.CertJobRepository,
 	certSvc domain.CertificateService,
 	distSvc domain.DistributionService,
 ) domain.SchedulerService {
 	return &schedulerService{
-		certRepo: certRepo,
-		certSvc:  certSvc,
-		distSvc:  distSvc,
-		stopCh:   make(chan struct{}),
+		certRepo:    certRepo,
+		certJobRepo: certJobRepo,
+		certSvc:     certSvc,
+		distSvc:     distSvc,
+		stopCh:      make(chan struct{}),
 	}
 }
 
@@ -89,13 +92,27 @@ func (s *schedulerService) runRenewalCheck(ctx context.Context) {
 
 		log.Printf("[SCHEDULER] Renewal job %s dibuat untuk certificate %s", job.UUID, cert.Name)
 
-		// Distribusi ke seluruh node setelah berhasil (async)
-		go func(certUUID string) {
-			// Tunggu sebentar untuk job selesai (polling sederhana)
-			time.Sleep(5 * time.Minute)
-			if _, err := s.distSvc.DistributeToAll(ctx, certUUID, systemActorID); err != nil {
-				log.Printf("[SCHEDULER] Distribusi certificate %s gagal: %v", certUUID, err)
+		// Poll status job setiap 15 detik (max 10 menit), distribusi hanya jika renewal berhasil
+		go func(certName, certUUID, jobUUID string) {
+			for i := 0; i < 40; i++ {
+				time.Sleep(15 * time.Second)
+				j, err := s.certJobRepo.FindByUUID(ctx, jobUUID)
+				if err != nil {
+					continue
+				}
+				if j.Status == domain.JobStatusSuccess {
+					log.Printf("[SCHEDULER] Renewal %s berhasil, mulai distribusi ke semua node", certName)
+					if _, err := s.distSvc.DistributeToAll(ctx, certUUID, systemActorID); err != nil {
+						log.Printf("[SCHEDULER] Distribusi certificate %s gagal: %v", certName, err)
+					}
+					return
+				}
+				if j.Status == domain.JobStatusFailed {
+					log.Printf("[SCHEDULER] Renewal %s gagal, distribusi dibatalkan", certName)
+					return
+				}
 			}
-		}(cert.UUID)
+			log.Printf("[SCHEDULER] Timeout menunggu renewal job %s untuk certificate %s", jobUUID, certName)
+		}(cert.Name, cert.UUID, job.UUID)
 	}
 }

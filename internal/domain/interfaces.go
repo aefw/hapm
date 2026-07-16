@@ -87,6 +87,7 @@ type CertificateRepository interface {
 	FindByName(ctx context.Context, name string) (*Certificate, error)
 	List(ctx context.Context, filter ListFilter) ([]*Certificate, int, error)
 	ListNeedingRenewal(ctx context.Context) ([]*Certificate, error)
+	ListByStatus(ctx context.Context, status CertStatus) ([]*Certificate, error)
 	Create(ctx context.Context, c *Certificate) error
 	Update(ctx context.Context, c *Certificate) error
 	Delete(ctx context.Context, uuid string) error
@@ -107,6 +108,7 @@ type CertJobRepository interface {
 type CertDeploymentRepository interface {
 	FindByUUID(ctx context.Context, uuid string) (*CertDeployment, error)
 	ListByCert(ctx context.Context, certUUID string) ([]*CertDeployment, error)
+	ListRecentFailed(ctx context.Context, days int) ([]*CertDeployment, error)
 	Create(ctx context.Context, d *CertDeployment) error
 	UpdateStatus(ctx context.Context, uuid, status, errMsg string) error
 }

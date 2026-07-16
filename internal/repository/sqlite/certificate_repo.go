@@ -85,6 +85,23 @@ func (r *CertificateRepository) List(ctx context.Context, f domain.ListFilter) (
 	return certs, total, rows.Err()
 }
 
+func (r *CertificateRepository) ListByStatus(ctx context.Context, status domain.CertStatus) ([]*domain.Certificate, error) {
+	rows, err := r.db.QueryContext(ctx, certSelectCols+` WHERE status=? ORDER BY timestamp DESC LIMIT 100`, string(status))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var certs []*domain.Certificate
+	for rows.Next() {
+		c, err := scanCert(rows)
+		if err != nil {
+			return nil, err
+		}
+		certs = append(certs, c)
+	}
+	return certs, rows.Err()
+}
+
 func (r *CertificateRepository) ListNeedingRenewal(ctx context.Context) ([]*domain.Certificate, error) {
 	q := certSelectCols + `
 		WHERE auto_renew = 1
@@ -379,6 +396,30 @@ func (r *CertDeploymentRepository) ListByCert(ctx context.Context, certUUID stri
 		deployments = append(deployments, d)
 	}
 	return deployments, rows.Err()
+}
+
+func (r *CertDeploymentRepository) ListRecentFailed(ctx context.Context, days int) ([]*domain.CertDeployment, error) {
+	q := `SELECT d.uuid, d.cert_uuid, d.id_nodes, n.name,
+		d.status, d.error_message, d.deployed_at, d.created, d.timestamp
+		FROM certificate_deployments d
+		LEFT JOIN nodes n ON n.id_nodes = d.id_nodes
+		WHERE d.status = 'failed'
+		  AND d.created >= datetime('now', '-' || ? || ' days')
+		ORDER BY d.created DESC LIMIT 100`
+	rows, err := r.db.QueryContext(ctx, q, days)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*domain.CertDeployment
+	for rows.Next() {
+		d, err := scanCertDeployment(rows)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, d)
+	}
+	return items, rows.Err()
 }
 
 func (r *CertDeploymentRepository) Create(ctx context.Context, d *domain.CertDeployment) error {
