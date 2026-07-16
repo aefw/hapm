@@ -428,6 +428,17 @@ Password: admin
 
 > `https_frontend_enabled`: `false` (default) — frontend `https_in` hanya di-generate otomatis jika ada domain dengan `ssl_mode=terminate`. `true` — selalu generate `frontend https_in` pada konfigurasi HAProxy node ini, terlepas dari konfigurasi domain.
 
+**Provision Progress Tracking**
+
+`POST /api/v1/nodes/{id}/provision` mengembalikan `202 Accepted` segera dan menjalankan instalasi di background. Progress dapat dipantau via `GET /api/v1/nodes/{id}` dengan field berikut:
+
+| Field | Tipe | Keterangan |
+|---|---|---|
+| `provision_step` | `int` | Step terakhir yang dicapai: `0`=idle, `1`=Deteksi OS, `2`=Tambah Repo, `3`=Install HAProxy, `4`=Buat Direktori, `5`=Aktifkan Service, `6`=Install acme.sh, `7`=Selesai |
+| `provision_error` | `string` | Pesan error jika gagal pada step tertentu; kosong jika berhasil atau belum pernah provision |
+
+Provision selesai ketika `provision_step === 7` (dan `status === "online"`). Jika `provision_error` terisi, provision gagal pada `provision_step` yang tercatat. Provision bersifat **idempotent** — aman dijalankan ulang jika gagal di tengah jalan.
+
 > **Catatan SSL Cert saat Deploy**: Pipeline deploy (`POST /api/v1/nodes/{id}/deploy`) secara otomatis mendistribusikan semua SSL cert aktif yang dipakai domain ke node (`/etc/haproxy/certs/<uuid>.pem`) sebelum validasi dan reload HAProxy. Tidak perlu menjalankan endpoint deploy cert secara manual sebelum deploy config.
 
 ---

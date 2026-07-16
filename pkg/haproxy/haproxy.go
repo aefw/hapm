@@ -31,9 +31,15 @@ type StatsCollector interface {
 	GetBackendStats(ctx context.Context, conn *ssh.Connection) ([]*domain.BackendStats, error)
 }
 
+// ProgressFn adalah callback yang dipanggil setiap kali provision memasuki step baru.
+// step: 1=Deteksi OS, 2=Tambah Repo, 3=Install HAProxy, 4=Buat Direktori,
+//
+//	5=Aktifkan Service, 6=Install acme.sh, 7=Selesai (dipanggil oleh service setelah UpdateStatus).
+type ProgressFn func(step int)
+
 // Provisioner mendefinisikan kontrak untuk provisioning HAProxy pada node baru
 type Provisioner interface {
-	Install(ctx context.Context, conn *ssh.Connection) error
+	Install(ctx context.Context, conn *ssh.Connection, progressFn ProgressFn) error
 	GetVersion(ctx context.Context, conn *ssh.Connection) (string, error)
 }
 
@@ -521,8 +527,10 @@ func NewProvisioner(sshClient ssh.Client) Provisioner {
 
 // Install menginstall HAProxy 3.x (latest stable) pada node melalui SSH.
 // Mendukung Debian/Ubuntu (via official PPA) dan RHEL/CentOS/AlmaLinux/Rocky.
-func (p *provisioner) Install(ctx context.Context, conn *ssh.Connection) error {
-	// Deteksi OS
+// progressFn dipanggil di awal setiap step sehingga caller bisa menyimpan progress ke DB.
+func (p *provisioner) Install(ctx context.Context, conn *ssh.Connection, progressFn ProgressFn) error {
+	// Step 1: Deteksi OS
+	progressFn(1)
 	osID, err := p.sshClient.RunCommand(ctx, conn,
 		`grep -i '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"' | tr '[:upper:]' '[:lower:]'`)
 	if err != nil {
@@ -532,33 +540,45 @@ func (p *provisioner) Install(ctx context.Context, conn *ssh.Connection) error {
 
 	switch {
 	case osID == "ubuntu" || osID == "debian":
-		if err := p.installDebian(ctx, conn); err != nil {
+		if err := p.installDebian(ctx, conn, progressFn); err != nil {
 			return err
 		}
 	case osID == "centos" || osID == "rhel" || osID == "almalinux" || osID == "rocky" || osID == "fedora":
-		if err := p.installRHEL(ctx, conn); err != nil {
+		if err := p.installRHEL(ctx, conn, progressFn); err != nil {
 			return err
 		}
 	default:
 		return fmt.Errorf("provisioner: OS tidak didukung: %s (gunakan Debian/Ubuntu atau RHEL/AlmaLinux/Rocky)", osID)
 	}
 
-	// Setup direktori — semua butuh sudo karena menulis ke /etc dan mengelola systemd
-	setupCmds := []string{
+	// Step 4: Buat direktori HAProxy
+	progressFn(4)
+	dirCmds := []string{
 		"sudo mkdir -p /etc/haproxy/certs && sudo chmod 700 /etc/haproxy/certs",
 		"sudo mkdir -p /etc/haproxy/maps",
 		"sudo mkdir -p /etc/haproxy/errors",
 		"sudo mkdir -p /run/haproxy",
-		"sudo systemctl enable haproxy",
-		"sudo systemctl start haproxy || true",
 	}
-	for _, cmd := range setupCmds {
+	for _, cmd := range dirCmds {
 		if out, err := p.sshClient.RunCommand(ctx, conn, cmd); err != nil {
-			return fmt.Errorf("provisioner: setup direktori gagal [%s]: %v — output: %s", cmd, err, strings.TrimSpace(out))
+			return fmt.Errorf("provisioner: buat direktori gagal [%s]: %v — output: %s", cmd, err, strings.TrimSpace(out))
 		}
 	}
 
-	// Install acme.sh untuk Let's Encrypt
+	// Step 5: Aktifkan service HAProxy
+	progressFn(5)
+	svcCmds := []string{
+		"sudo systemctl enable haproxy",
+		"sudo systemctl start haproxy || true",
+	}
+	for _, cmd := range svcCmds {
+		if out, err := p.sshClient.RunCommand(ctx, conn, cmd); err != nil {
+			return fmt.Errorf("provisioner: aktifkan service gagal [%s]: %v — output: %s", cmd, err, strings.TrimSpace(out))
+		}
+	}
+
+	// Step 6: Install acme.sh untuk Let's Encrypt
+	progressFn(6)
 	if err := p.installAcmeSh(ctx, conn); err != nil {
 		// Non-fatal — bisa diinstall manual
 		fmt.Printf("[WARN] provisioner: install acme.sh gagal: %v\n", err)
@@ -568,13 +588,8 @@ func (p *provisioner) Install(ctx context.Context, conn *ssh.Connection) error {
 }
 
 // installDebian menginstall HAProxy LTS pada Debian atau Ubuntu via SSH.
-//
-//   - Ubuntu  → Launchpad PPA (ppa:vbernat/haproxy-X.Y)
-//   - Debian  → haproxy.debian.net (hanya menyediakan distro Debian)
-//
-// Semua command sistem dijalankan dengan sudo — user SSH harus memiliki sudo NOPASSWD.
-// Menghapus semua sisa konfigurasi repo HAProxy lama sebelum install ulang.
-func (p *provisioner) installDebian(ctx context.Context, conn *ssh.Connection) error {
+// Step 2 (tambah repo) dan step 3 (install HAProxy) dinotifikasi via progressFn.
+func (p *provisioner) installDebian(ctx context.Context, conn *ssh.Connection, progressFn ProgressFn) error {
 	// Deteksi OS ID untuk membedakan Ubuntu vs Debian
 	osIDRaw, _ := p.sshClient.RunCommand(ctx, conn,
 		`grep -i '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"' | tr '[:upper:]' '[:lower:]'`)
@@ -588,9 +603,8 @@ func (p *provisioner) installDebian(ctx context.Context, conn *ssh.Connection) e
 	}
 	codename = strings.TrimSpace(codename)
 
-	// ── Tahap 1: bersihkan semua sisa konfigurasi HAProxy lama ──────────────────
-	// Gunakan wildcard agar semua varian nama file tertangkap (haproxy.list,
-	// vbernat-ubuntu-haproxy-*.list, dll.). Selalu sukses (|| true).
+	// Step 2: Tambah repository HAProxy — cleanup lama + install dependency + daftarkan repo
+	progressFn(2)
 	cleanupCmd := strings.Join([]string{
 		`sudo find /etc/apt/sources.list.d/ -name '*haproxy*' -delete 2>/dev/null`,
 		`sudo find /usr/share/keyrings/ -name '*haproxy*' -delete 2>/dev/null`,
@@ -602,7 +616,6 @@ func (p *provisioner) installDebian(ctx context.Context, conn *ssh.Connection) e
 		return fmt.Errorf("provisioner: cleanup repo lama gagal: %v", err)
 	}
 
-	// ── Tahap 2: install dependency ──────────────────────────────────────────────
 	depCmds := []string{
 		"sudo apt-get update -qq",
 		"sudo apt-get install -y --no-install-recommends curl socat",
@@ -613,16 +626,13 @@ func (p *provisioner) installDebian(ctx context.Context, conn *ssh.Connection) e
 		}
 	}
 
-	// ── Tahap 3: daftarkan repo HAProxy LTS ──────────────────────────────────────
 	var repoCmds []string
 	if osID == "ubuntu" {
-		// Ubuntu: gunakan Launchpad PPA (haproxy.debian.net TIDAK menyediakan Ubuntu)
 		repoCmds = []string{
 			"sudo apt-get install -y --no-install-recommends software-properties-common",
 			fmt.Sprintf("sudo add-apt-repository -y ppa:vbernat/haproxy-%s", hapLTSVersion),
 		}
 	} else {
-		// Debian (bookworm, bullseye, dll.): gunakan haproxy.debian.net
 		repoCmds = []string{
 			"sudo mkdir -p /etc/apt/keyrings",
 			"sudo curl -fsSL https://haproxy.debian.net/haproxy-archive-keyring.gpg -o /etc/apt/keyrings/haproxy-archive-keyring.gpg",
@@ -638,7 +648,8 @@ func (p *provisioner) installDebian(ctx context.Context, conn *ssh.Connection) e
 		}
 	}
 
-	// ── Tahap 4: update apt dan install HAProxy LTS ───────────────────────────────
+	// Step 3: Install HAProxy
+	progressFn(3)
 	installCmds := []string{
 		"sudo apt-get update -qq",
 		fmt.Sprintf("sudo apt-get install -y --no-install-recommends haproxy=%s.*", hapLTSVersion),
@@ -655,15 +666,23 @@ func (p *provisioner) installDebian(ctx context.Context, conn *ssh.Connection) e
 
 // installRHEL menginstall HAProxy dari EPEL pada sistem berbasis RHEL.
 // Semua command sistem dijalankan dengan sudo — user SSH harus memiliki sudo NOPASSWD.
-func (p *provisioner) installRHEL(ctx context.Context, conn *ssh.Connection) error {
-	cmds := []string{
-		"sudo yum install -y epel-release || sudo dnf install -y epel-release || true",
+func (p *provisioner) installRHEL(ctx context.Context, conn *ssh.Connection, progressFn ProgressFn) error {
+	// Step 2: Tambah EPEL repository
+	progressFn(2)
+	if out, err := p.sshClient.RunCommand(ctx, conn,
+		"sudo yum install -y epel-release || sudo dnf install -y epel-release || true"); err != nil {
+		return fmt.Errorf("provisioner: install EPEL gagal: %v — output: %s", err, strings.TrimSpace(out))
+	}
+
+	// Step 3: Install HAProxy
+	progressFn(3)
+	installCmds := []string{
 		"sudo yum install -y haproxy socat curl || sudo dnf install -y haproxy socat curl",
 		"haproxy -v",
 	}
-	for _, cmd := range cmds {
+	for _, cmd := range installCmds {
 		if out, err := p.sshClient.RunCommand(ctx, conn, cmd); err != nil {
-			return fmt.Errorf("provisioner: rhel install gagal saat menjalankan [%s]: %v — output: %s", cmd, err, strings.TrimSpace(out))
+			return fmt.Errorf("provisioner: rhel install gagal [%s]: %v — output: %s", cmd, err, strings.TrimSpace(out))
 		}
 	}
 	return nil

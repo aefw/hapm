@@ -70,6 +70,8 @@ func (s *nodeService) List(ctx context.Context, filter domain.ListFilter) ([]*do
 			LastChecked:          n.LastChecked,
 			BehindCloudflare:     n.BehindCloudflare,
 			HTTPSFrontendEnabled: n.HTTPSFrontendEnabled,
+			ProvisionStep:        n.ProvisionStep,
+			ProvisionError:       n.ProvisionError,
 		}
 	}
 	return summaries, total, nil
@@ -277,7 +279,10 @@ func (s *nodeService) TestConnection(ctx context.Context, id int) (*domain.TestC
 	}, nil
 }
 
-// Provision menginstall HAProxy pada node baru
+// Provision menginstall HAProxy pada node baru.
+// Progress setiap step disimpan ke DB via UpdateProvisionProgress sehingga frontend
+// bisa menampilkan posisi step yang sedang berjalan atau step mana yang gagal,
+// bahkan setelah browser di-refresh atau tab ditutup.
 func (s *nodeService) Provision(ctx context.Context, id int, actorID int) error {
 	node, err := s.repo.FindByID(ctx, id)
 	if err != nil {
@@ -296,14 +301,26 @@ func (s *nodeService) Provision(ctx context.Context, id int, actorID int) error 
 		PrivateKey: privateKey,
 	}
 
-	if err := s.provisioner.Install(ctx, conn); err != nil {
-		// Gunakan %v (bukan %w) agar seluruh chain error tersimpan sebagai pesan display
-		return fmt.Errorf("provision gagal: %v", err)
+	// Reset progress sebelum mulai — hapus error provision sebelumnya
+	_ = s.repo.UpdateProvisionProgress(ctx, id, 0, "")
+
+	// Track step terakhir yang dipanggil agar bisa disimpan bersama error jika gagal
+	currentStep := 0
+	progressFn := func(step int) {
+		currentStep = step
+		_ = s.repo.UpdateProvisionProgress(ctx, id, step, "")
 	}
 
-	// Ambil versi setelah install
+	if err := s.provisioner.Install(ctx, conn, progressFn); err != nil {
+		_ = s.repo.UpdateProvisionProgress(ctx, id, currentStep, err.Error())
+		return fmt.Errorf("provision gagal pada step %d: %v", currentStep, err)
+	}
+
+	// Ambil versi setelah install dan update status node ke online
 	version, _ := s.provisioner.GetVersion(ctx, conn)
 	_ = s.repo.UpdateStatus(ctx, id, domain.NodeStatusOnline, version)
+	// Step 7 = provision selesai
+	_ = s.repo.UpdateProvisionProgress(ctx, id, 7, "")
 
 	_ = s.auditSvc.Log(ctx, &domain.AuditLog{
 		UserID:       &actorID,

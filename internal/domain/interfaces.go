@@ -49,6 +49,10 @@ type NodeRepository interface {
 	Update(ctx context.Context, n *Node) error
 	Delete(ctx context.Context, id int) error
 	UpdateStatus(ctx context.Context, id int, status NodeStatus, version string) error
+	// UpdateProvisionProgress memperbarui step dan pesan error proses provision.
+	// step: 0=idle/reset, 1-6=sedang berjalan atau gagal, 7=selesai.
+	// errMsg kosong berarti step berhasil; non-kosong berarti gagal pada step tersebut.
+	UpdateProvisionProgress(ctx context.Context, id int, step int, errMsg string) error
 }
 
 // BackendRepository mendefinisikan kontrak akses data BackendPool dan BackendServer

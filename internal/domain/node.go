@@ -23,11 +23,14 @@ type Node struct {
 	Description      string     `json:"description"`
 	Status           NodeStatus `json:"status"`
 	LastChecked      *time.Time `json:"last_checked,omitempty"`
-	HAProxyVersion   string     `json:"haproxy_version,omitempty"`
-	BehindCloudflare     bool       `json:"behind_cloudflare"`      // true = ekstrak IP dari CF-Connecting-IP
-	HTTPSFrontendEnabled bool       `json:"https_frontend_enabled"` // true = selalu generate frontend https_in
-	Created              time.Time  `json:"created"`
-	Timestamp            time.Time  `json:"timestamp"`
+	HAProxyVersion       string     `json:"haproxy_version,omitempty"`
+	BehindCloudflare     bool       `json:"behind_cloudflare"`
+	HTTPSFrontendEnabled bool       `json:"https_frontend_enabled"`
+	// Provision tracking — diperbarui oleh background goroutine saat provision berjalan
+	ProvisionStep  int    `json:"provision_step"`            // 0=idle, 1-6=in-progress/failed, 7=done
+	ProvisionError string `json:"provision_error,omitempty"` // pesan error jika gagal, kosong jika sukses
+	Created   time.Time `json:"created"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 // NodeSummary adalah versi ringkas Node untuk list response
@@ -43,6 +46,8 @@ type NodeSummary struct {
 	LastChecked          *time.Time `json:"last_checked,omitempty"`
 	BehindCloudflare     bool       `json:"behind_cloudflare"`
 	HTTPSFrontendEnabled bool       `json:"https_frontend_enabled"`
+	ProvisionStep        int        `json:"provision_step"`
+	ProvisionError       string     `json:"provision_error,omitempty"`
 }
 
 // SSHKeyDecrypted adalah struct untuk membawa private key yang sudah didekripsi

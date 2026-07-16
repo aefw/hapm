@@ -557,6 +557,14 @@ CREATE INDEX IF NOT EXISTS idx_domains_cert_uuid ON domains(cert_uuid);
 		// https_frontend_enabled = 1: selalu generate frontend https_in pada node ini
 		sql: `ALTER TABLE nodes ADD COLUMN https_frontend_enabled INTEGER NOT NULL DEFAULT 0`,
 	},
+	{
+		version: 34,
+		name:    "nodes_add_provision_tracking",
+		// provision_step: step terakhir yang berhasil (0=idle, 1-6=sedang berjalan/gagal, 7=selesai)
+		// provision_error: pesan error jika gagal, kosong jika sukses atau belum pernah provision
+		sql: `ALTER TABLE nodes ADD COLUMN provision_step  INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE nodes ADD COLUMN provision_error TEXT    NOT NULL DEFAULT ''`,
+	},
 }
 
 // RunMigrations menjalankan semua migrasi yang belum diaplikasikan.

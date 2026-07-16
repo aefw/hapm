@@ -17,7 +17,8 @@ func NewNodeRepository(db *sql.DB) *NodeRepository {
 
 const nodeSelectCols = `SELECT id_nodes, name, hostname, ip_address, ssh_port, ssh_user,
        ssh_private_key, description, status, last_checked, haproxy_version,
-       behind_cloudflare, https_frontend_enabled, created, timestamp FROM nodes`
+       behind_cloudflare, https_frontend_enabled, provision_step, provision_error,
+       created, timestamp FROM nodes`
 
 func (r *NodeRepository) FindByID(ctx context.Context, id int) (*domain.Node, error) {
 	return scanNode(r.db.QueryRowContext(ctx, nodeSelectCols+` WHERE id_nodes=? LIMIT 1`, id))
@@ -45,7 +46,8 @@ func (r *NodeRepository) List(ctx context.Context, f domain.ListFilter) ([]*doma
 	// nodeSelectCols sudah berisi "SELECT ... FROM nodes", jadi kita ganti FROM-nya
 	selectCols := `SELECT id_nodes, name, hostname, ip_address, ssh_port, ssh_user,
 	       ssh_private_key, description, status, last_checked, haproxy_version,
-	       behind_cloudflare, https_frontend_enabled, created, timestamp ` + base + ` ORDER BY name ASC`
+	       behind_cloudflare, https_frontend_enabled, provision_step, provision_error,
+	       created, timestamp ` + base + ` ORDER BY name ASC`
 	qArgs := append([]interface{}{}, args...)
 	if f.Limit > 0 {
 		selectCols += " LIMIT ? OFFSET ?"
@@ -107,14 +109,23 @@ func (r *NodeRepository) UpdateStatus(ctx context.Context, id int, status domain
 	return err
 }
 
+func (r *NodeRepository) UpdateProvisionProgress(ctx context.Context, id int, step int, errMsg string) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE nodes SET provision_step=?, provision_error=?, timestamp=CURRENT_TIMESTAMP WHERE id_nodes=?`,
+		step, errMsg, id)
+	return err
+}
+
 func scanNode(s scanner) (*domain.Node, error) {
 	var n domain.Node
-	var key, desc, lastChecked, version sql.NullString
+	var key, desc, version, provErr sql.NullString
+	var lastChecked sql.NullTime
 	var behindCloudflare, httpsFrontendEnabled int
 	err := s.Scan(
 		&n.ID, &n.Name, &n.Hostname, &n.IPAddress, &n.SSHPort, &n.SSHUser,
 		&key, &desc, &n.Status, &lastChecked, &version,
-		&behindCloudflare, &httpsFrontendEnabled, &n.Created, &n.Timestamp,
+		&behindCloudflare, &httpsFrontendEnabled, &n.ProvisionStep, &provErr,
+		&n.Created, &n.Timestamp,
 	)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("node tidak ditemukan")
@@ -127,5 +138,9 @@ func scanNode(s scanner) (*domain.Node, error) {
 	n.HAProxyVersion = version.String
 	n.BehindCloudflare = behindCloudflare == 1
 	n.HTTPSFrontendEnabled = httpsFrontendEnabled == 1
+	n.ProvisionError = provErr.String
+	if lastChecked.Valid {
+		n.LastChecked = &lastChecked.Time
+	}
 	return &n, nil
 }
