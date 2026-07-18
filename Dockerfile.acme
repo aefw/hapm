@@ -15,7 +15,9 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /hapm-acme ./cmd/hapm-acme
+# ARG TARGETARCH diisi otomatis oleh docker buildx sesuai --platform
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -o /hapm-acme ./cmd/hapm-acme
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Runtime image
@@ -23,15 +25,11 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /hapm-acme ./cmd/hapm-acme
 FROM alpine:3.20
 
 # Install LEGO CLI
+# TARGETARCH dipakai langsung — tidak perlu uname -m yang bergantung pada emulasi QEMU
 ARG LEGO_VERSION=v4.17.4
+ARG TARGETARCH
 RUN apk add --no-cache ca-certificates curl && \
-    ARCH=$(uname -m) && \
-    case "$ARCH" in \
-      x86_64)  LEGO_ARCH="amd64" ;; \
-      aarch64) LEGO_ARCH="arm64" ;; \
-      *)       LEGO_ARCH="amd64" ;; \
-    esac && \
-    curl -fsSL "https://github.com/go-acme/lego/releases/download/${LEGO_VERSION}/lego_${LEGO_VERSION}_linux_${LEGO_ARCH}.tar.gz" \
+    curl -fsSL "https://github.com/go-acme/lego/releases/download/${LEGO_VERSION}/lego_${LEGO_VERSION}_linux_${TARGETARCH}.tar.gz" \
       -o /tmp/lego.tar.gz && \
     tar -xzf /tmp/lego.tar.gz -C /usr/local/bin lego && \
     chmod +x /usr/local/bin/lego && \
