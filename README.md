@@ -31,9 +31,11 @@
 - Docker Compose v2 (`docker compose`, bukan `docker-compose`)
 - Port 8282 tersedia di server
 
+> **Tidak perlu build.** Image `hapm` dan `hapm-acme` sudah tersedia di GitHub Container Registry untuk `linux/amd64` dan `linux/arm64`. Docker otomatis memilih image yang sesuai arsitektur server.
+
 ### Langkah Instalasi
 
-**1. Clone repository**
+**1. Clone repository** *(hanya untuk mendapatkan `docker-compose.yml` dan `.env.example`)*
 
 ```bash
 git clone https://github.com/aefw/hapm.git
@@ -73,6 +75,8 @@ APP_ENCRYPTION_KEY=ganti_dengan_64_karakter_hex_acak
 docker compose up -d
 ```
 
+Docker akan pull image `ghcr.io/aefw/hapm:latest` dan `ghcr.io/aefw/hapm-acme:latest` secara otomatis. Tidak ada proses build.
+
 **5. Akses aplikasi**
 
 Buka browser dan akses:
@@ -91,7 +95,7 @@ Login dengan:
 
 ### Update / Upgrade
 
-**Langkah yang aman:**
+Karena image sudah pre-built di registry, upgrade hanya perlu pull image terbaru:
 
 **1. Backup data dulu (wajib sebelum upgrade)**
 
@@ -103,27 +107,40 @@ docker run --rm \
   tar czf /backup/hapm_backup_$(date +%Y%m%d_%H%M%S).tar.gz -C / data
 ```
 
-File backup akan tersimpan di direktori repo dengan nama `hapm_backup_YYYYMMDD_HHMMSS.tar.gz`.
+File backup akan tersimpan di direktori dengan nama `hapm_backup_YYYYMMDD_HHMMSS.tar.gz`.
 
-**2. Upgrade aplikasi**
-
-```bash
-git pull
-docker compose up -d --build
-```
-
-atau
+**2. Pull image terbaru dan restart**
 
 ```bash
-git pull
-docker compose build --no-cache
+docker compose pull
 docker compose up -d
 ```
 
 > **JANGAN gunakan `docker compose down -v`** — flag `-v` menghapus volume dan seluruh data.
-> Gunakan `docker compose up -d --build` (satu perintah) agar volume tetap terjaga.
 
 Data tidak akan hilang — database SQLite dan certificate tersimpan di Docker volume `hapm_data`.
+
+---
+
+### Build dari Source (Developer)
+
+Jika ingin build sendiri dari source (misalnya setelah modifikasi kode):
+
+```bash
+# Uncomment blok `build:` di docker-compose.yml terlebih dahulu, lalu:
+docker compose build --no-cache
+docker compose up -d
+```
+
+Untuk build multi-arch dan push ke registry sendiri:
+
+```bash
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t ghcr.io/<username>/hapm:latest -f Dockerfile --push .
+
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t ghcr.io/<username>/hapm-acme:latest -f Dockerfile.acme --push .
+```
 
 ---
 

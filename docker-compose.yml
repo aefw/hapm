@@ -12,10 +12,13 @@ version: "3.9"
 services:
   # ─── HAPM API Server ───────────────────────────────────────────────────────
   hapm:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: hapm:latest
+    # Image pre-built multi-arch (linux/amd64 + linux/arm64) dari GitHub Container Registry.
+    # Tidak perlu build — docker compose up -d langsung pull image yang sesuai arsitektur.
+    image: ghcr.io/aefw/hapm:latest
+    # Untuk developer yang ingin build dari source, uncomment blok build berikut:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
     container_name: hapm
     restart: unless-stopped
 
@@ -95,10 +98,12 @@ services:
 
   # ─── hapm-acme: ACME Worker Service ───────────────────────────────────────
   hapm-acme:
-    build:
-      context: .
-      dockerfile: Dockerfile.acme
-    image: hapm-acme:latest
+    # Image pre-built multi-arch (linux/amd64 + linux/arm64) dari GitHub Container Registry.
+    image: ghcr.io/aefw/hapm-acme:latest
+    # Untuk developer yang ingin build dari source, uncomment blok build berikut:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile.acme
     container_name: hapm-acme
     restart: unless-stopped
 
