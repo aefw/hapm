@@ -2,6 +2,7 @@
 # Stage 1: Builder
 # Menggunakan Go official image untuk build binary statis.
 # CGO_ENABLED=0 karena kita pakai modernc.org/sqlite (pure Go, no CGO).
+# TARGETARCH ditetapkan otomatis oleh docker buildx sesuai --platform yang dipilih.
 # ─────────────────────────────────────────────────────────────────────────────
 FROM golang:1.23-alpine AS builder
 
@@ -17,12 +18,17 @@ RUN go mod download
 # Copy seluruh source code
 COPY . .
 
+# ARG TARGETARCH diisi otomatis oleh docker buildx (amd64 / arm64 / arm/v7 dst.)
+# Tidak perlu hardcode — satu Dockerfile untuk semua arsitektur.
+ARG TARGETARCH
+
 # Build binary statis
 # - CGO_ENABLED=0: pure Go, tidak butuh libc
 # - GOOS=linux: target Linux (container)
+# - GOARCH=${TARGETARCH}: arsitektur sesuai platform yang di-build
 # - -ldflags="-s -w": strip debug info, kurangi ukuran binary
 # - -trimpath: hapus path absolut dari binary untuk reproducible build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
     -ldflags="-s -w -X main.version=$(git describe --tags --always --dirty 2>/dev/null || echo dev)" \
     -trimpath \
     -o hapm \
