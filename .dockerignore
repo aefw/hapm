@@ -13,8 +13,13 @@
 *.db-wal
 /data/
 
-# Binary hasil build lokal
+# Binary hasil build lokal — kecuali aefw-serial pre-built yang dibutuhkan Docker
 /bin/
+!/bin/aefw-serial-amd64
+!/bin/aefw-serial-arm64
+!/bin/aefw-serial-armv7
+!/bin/aefw-serial-armv6
+!/bin/aefw-serial-386
 hapm
 hapm-linux-amd64
 hapm-linux-arm64
