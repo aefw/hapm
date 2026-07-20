@@ -13,9 +13,29 @@ env:
   IMAGE_ACME: ${{ github.repository }}-acme     # aefw/hapm-acme
 
 jobs:
+  # Hapus semua GHA cache sebelum build (one-time cleanup, bisa dihapus step ini setelah build berhasil)
+  clear-cache:
+    name: Clear GHA cache
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Hapus semua cache
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          IDS=$(gh cache list -R ${{ github.repository }} -L 100 --json id -q '.[].id' | tr '\n' ' ')
+          if [ -n "$IDS" ]; then
+            echo "Menghapus cache: $IDS"
+            echo $IDS | xargs -n1 gh cache delete -R ${{ github.repository }}
+          else
+            echo "Tidak ada cache yang perlu dihapus"
+          fi
+
   build-hapm:
     name: Build hapm (backend)
     runs-on: ubuntu-latest
+    needs: clear-cache
     permissions:
       contents: read
       packages: write
@@ -59,12 +79,13 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=hapm-v2
-          cache-to: type=gha,mode=max,scope=hapm-v2
+          cache-from: type=gha,scope=hapm
+          cache-to: type=gha,mode=max,scope=hapm
 
   build-acme:
     name: Build hapm-acme (ACME worker)
     runs-on: ubuntu-latest
+    needs: clear-cache
     permissions:
       contents: read
       packages: write
