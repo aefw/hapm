@@ -59,8 +59,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=hapm
-          cache-to: type=gha,mode=max,scope=hapm
+          cache-from: type=gha,scope=hapm-v2
+          cache-to: type=gha,mode=max,scope=hapm-v2
 
   build-acme:
     name: Build hapm-acme (ACME worker)
