@@ -201,6 +201,30 @@ func (s *deployService) runPipeline(ctx context.Context, deployment *domain.Depl
 		return
 	}
 
+	// Upload custom error pages jika ada
+	if len(generated.ErrorPages) > 0 {
+		if _, err := s.sshClient.RunCommand(ctx, conn, "sudo mkdir -p /etc/haproxy/errors"); err != nil {
+			log.Printf("[WARN] deploy: gagal membuat direktori /etc/haproxy/errors: %v", err)
+		}
+		for code, content := range generated.ErrorPages {
+			tmpErrPath := fmt.Sprintf("/tmp/hapm_error_%d.http", code)
+			if err := s.sshClient.UploadFile(ctx, conn, []byte(content), tmpErrPath); err != nil {
+				updateStatus(domain.DeployStatusFailed, domain.DeployStageUpload,
+					fmt.Sprintf("gagal upload error page %d ke node: %v", code, err))
+				s.logAuditFail(ctx, deployID, userID, nodeID, "upload-error-page", err)
+				return
+			}
+			finalPath := fmt.Sprintf("/etc/haproxy/errors/%d.http", code)
+			if out, err := s.sshClient.RunCommand(ctx, conn,
+				fmt.Sprintf("sudo mv %s %s && sudo chmod 644 %s", tmpErrPath, finalPath, finalPath)); err != nil {
+				updateStatus(domain.DeployStatusFailed, domain.DeployStageUpload,
+					fmt.Sprintf("gagal memindahkan error page %d: %v — %s", code, err, out))
+				s.logAuditFail(ctx, deployID, userID, nodeID, "upload-error-page-move", err)
+				return
+			}
+		}
+	}
+
 	// Pindahkan config dan map dari /tmp ke lokasi HAProxy dengan sudo
 	mvCmd := fmt.Sprintf(
 		"sudo mv %s /etc/haproxy/haproxy.cfg && sudo chmod 640 /etc/haproxy/haproxy.cfg && "+

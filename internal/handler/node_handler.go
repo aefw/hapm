@@ -39,6 +39,7 @@ func RegisterNodeRoutes(router *core.Router, cfg *config.Config, svc domain.Node
 		middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleAdmin, h.TestConnection)))
 	router.POST("/api/v1/nodes/{id}/provision",
 		middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleSuperAdmin, h.Provision)))
+
 }
 
 // List godoc
@@ -177,3 +178,4 @@ func (h *NodeHandler) Provision(w http.ResponseWriter, r *http.Request, params [
 
 	core.Error(w, http.StatusAccepted, "Provisioning dimulai — install HAProxy sedang berjalan di background. Pantau status node via GET /api/v1/nodes/"+strconv.Itoa(id))
 }
+

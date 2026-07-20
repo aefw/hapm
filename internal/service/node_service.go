@@ -173,6 +173,33 @@ func (s *nodeService) Update(ctx context.Context, id int, req *domain.UpdateNode
 	node.BehindCloudflare = req.BehindCloudflare
 	node.HTTPSFrontendEnabled = req.HTTPSFrontendEnabled
 
+	// Stats page config
+	node.StatsEnabled = req.StatsEnabled
+	node.StatsBindAddr = req.StatsBindAddr
+	if node.StatsBindAddr == "" {
+		node.StatsBindAddr = "127.0.0.1"
+	}
+	node.StatsPort = req.StatsPort
+	if node.StatsPort == 0 {
+		node.StatsPort = 8404
+	}
+	node.StatsURI = req.StatsURI
+	if node.StatsURI == "" {
+		node.StatsURI = "/stats"
+	}
+	node.StatsRefresh = req.StatsRefresh
+	if node.StatsRefresh == "" {
+		node.StatsRefresh = "10s"
+	}
+	node.StatsHideVersion = req.StatsHideVersion
+	node.StatsReadOnly = req.StatsReadOnly
+	node.StatsAdmin = req.StatsAdmin
+	if req.StatsAllowedGroups != nil {
+		node.StatsAllowedGroups = req.StatsAllowedGroups
+	} else {
+		node.StatsAllowedGroups = []int{}
+	}
+
 	// Re-enkripsi jika SSH key baru diberikan
 	if req.SSHPrivateKey != "" {
 		encryptedKey, err := security.Encrypt(req.SSHPrivateKey, s.cfg.Security.EncryptionKey)
@@ -332,3 +359,4 @@ func (s *nodeService) Provision(ctx context.Context, id int, actorID int) error 
 
 	return nil
 }
+

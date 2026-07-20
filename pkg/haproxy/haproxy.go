@@ -16,7 +16,7 @@ import (
 // Generator mendefinisikan kontrak untuk generate konfigurasi HAProxy
 type Generator interface {
 	// Generate menghasilkan (haproxy.cfg content, hosts.map content, error)
-	Generate(ctx context.Context, node *domain.Node, domains []*domain.DomainEntry, pools []*domain.BackendPool, certs []*domain.Certificate, services []*domain.Service, authGroups []*domain.AuthGroup) (string, string, error)
+	Generate(ctx context.Context, node *domain.Node, domains []*domain.DomainEntry, pools []*domain.BackendPool, certs []*domain.Certificate, services []*domain.Service, authGroups []*domain.AuthGroup, errorPages []*domain.ErrorPage) (string, string, error)
 }
 
 // Validator mendefinisikan kontrak untuk validasi konfigurasi HAProxy
@@ -66,6 +66,7 @@ func (g *generator) Generate(
 	certs []*domain.Certificate,
 	services []*domain.Service,
 	authGroups []*domain.AuthGroup,
+	errorPages []*domain.ErrorPage,
 ) (string, string, error) {
 	var sb strings.Builder
 	var hm strings.Builder // content untuk /etc/haproxy/map/hosts
@@ -99,7 +100,13 @@ func (g *generator) Generate(
 	sb.WriteString("    timeout connect   5s\n")
 	sb.WriteString("    timeout client   50s\n")
 	sb.WriteString("    timeout server   50s\n")
-	sb.WriteString("    timeout tunnel 3600s\n\n")
+	sb.WriteString("    timeout tunnel 3600s\n")
+	for _, ep := range errorPages {
+		if ep.Enabled && strings.TrimSpace(ep.Content) != "" {
+			sb.WriteString(fmt.Sprintf("    errorfile %d /etc/haproxy/errors/%d.http\n", ep.ErrorCode, ep.ErrorCode))
+		}
+	}
+	sb.WriteString("\n")
 
 	// ── userlist blocks (HAProxy Basic Auth) ──
 	// Satu userlist per group yang enabled dan memiliki member.
@@ -389,6 +396,73 @@ func (g *generator) Generate(
 			writeServerList(&sb, pool, true)
 			sb.WriteString("\n")
 		}
+	}
+
+	// ── HAProxy Statistics listen block ──────────────────────────────
+	// Hanya di-generate jika stats diaktifkan dan ada minimal satu user aktif dari group yang dipilih.
+	if node.StatsEnabled {
+		// Kumpulkan user unik dari semua allowed groups
+		allowedSet := make(map[int]bool, len(node.StatsAllowedGroups))
+		for _, gid := range node.StatsAllowedGroups {
+			allowedSet[gid] = true
+		}
+
+		var statsUsers []*domain.AuthUser
+		seenUser := make(map[int]bool)
+		for _, ag := range authGroups {
+			if !ag.Enabled || !allowedSet[ag.ID] {
+				continue
+			}
+			for _, u := range ag.Members {
+				if u.Enabled && u.PasswordHash != "" && !seenUser[u.ID] {
+					seenUser[u.ID] = true
+					statsUsers = append(statsUsers, u)
+				}
+			}
+		}
+
+		if len(statsUsers) > 0 {
+			sb.WriteString("userlist hapm_stats\n")
+			for _, u := range statsUsers {
+				sb.WriteString(fmt.Sprintf("    user %s password %s\n", u.Username, u.PasswordHash))
+			}
+			sb.WriteString("\n")
+		}
+
+		bindAddr := node.StatsBindAddr
+		if bindAddr == "" {
+			bindAddr = "127.0.0.1"
+		}
+		port := node.StatsPort
+		if port == 0 {
+			port = 8404
+		}
+		uri := node.StatsURI
+		if uri == "" {
+			uri = "/stats"
+		}
+		refresh := node.StatsRefresh
+		if refresh == "" {
+			refresh = "10s"
+		}
+
+		sb.WriteString("listen stats\n")
+		sb.WriteString(fmt.Sprintf("    bind %s:%d\n", bindAddr, port))
+		sb.WriteString("    mode http\n")
+		sb.WriteString("    stats enable\n")
+		sb.WriteString(fmt.Sprintf("    stats uri %s\n", uri))
+		sb.WriteString(fmt.Sprintf("    stats refresh %s\n", refresh))
+		if node.StatsHideVersion {
+			sb.WriteString("    stats hide-version\n")
+		}
+		if node.StatsAdmin && !node.StatsReadOnly {
+			sb.WriteString("    stats admin if TRUE\n")
+		}
+		if len(statsUsers) > 0 {
+			sb.WriteString("    http-request auth realm \"HAPM Statistics\" unless { http_auth(hapm_stats) }\n")
+		}
+		sb.WriteString("    no log\n")
+		sb.WriteString("\n")
 	}
 
 	return sb.String(), hm.String(), nil

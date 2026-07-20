@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/aefw/hapm/internal/domain"
 	"github.com/aefw/hapm/pkg/haproxy"
@@ -18,6 +19,8 @@ type configService struct {
 	certRepo      domain.CertificateRepository
 	serviceRepo   domain.ServiceRepository
 	authGroupRepo domain.AuthGroupRepository
+	errorPageRepo domain.ErrorPageRepository
+	settingRepo   domain.SettingRepository
 	generator     haproxy.Generator
 }
 
@@ -29,6 +32,8 @@ func NewConfigService(
 	certRepo domain.CertificateRepository,
 	serviceRepo domain.ServiceRepository,
 	authGroupRepo domain.AuthGroupRepository,
+	errorPageRepo domain.ErrorPageRepository,
+	settingRepo domain.SettingRepository,
 	generator haproxy.Generator,
 ) domain.ConfigService {
 	return &configService{
@@ -38,6 +43,8 @@ func NewConfigService(
 		certRepo:      certRepo,
 		serviceRepo:   serviceRepo,
 		authGroupRepo: authGroupRepo,
+		errorPageRepo: errorPageRepo,
+		settingRepo:   settingRepo,
 		generator:     generator,
 	}
 }
@@ -80,7 +87,31 @@ func (s *configService) GenerateForNode(ctx context.Context, nodeID int) (*domai
 		return nil, fmt.Errorf("config: list enabled auth groups: %w", err)
 	}
 
-	content, hostsMap, err := s.generator.Generate(ctx, node, domains, pools, certs, services, authGroups)
+	// Error pages: selalu deploy default HAPM branding untuk semua 8 kode.
+	// Jika fitur premium aktif, halaman yang sudah dikustomisasi dan enabled akan menggantikan default.
+	errorPageContent := make(map[int]string)
+	for _, info := range domain.SupportedErrorCodes {
+		errorPageContent[info.Code] = domain.WrapHTTPResponse(info.Code, info.Message, domain.DefaultHTML(info.Code, info.Message))
+	}
+	if s.errorPageRepo != nil && s.settingRepo != nil {
+		if setting, err := s.settingRepo.Get(ctx, domain.SettingCustomErrorPages); err == nil && setting.Value == "true" {
+			if all, err := s.errorPageRepo.List(ctx); err == nil {
+				for _, ep := range all {
+					if ep.Enabled && strings.TrimSpace(ep.Content) != "" {
+						info := domain.GetErrorCodeInfo(ep.ErrorCode)
+						errorPageContent[ep.ErrorCode] = domain.WrapHTTPResponse(ep.ErrorCode, info.Message, ep.Content)
+					}
+				}
+			}
+		}
+	}
+	// Semua 8 kode selalu aktif — errorfile selalu digenerate di haproxy.cfg
+	activeErrorPages := make([]*domain.ErrorPage, len(domain.SupportedErrorCodes))
+	for i, info := range domain.SupportedErrorCodes {
+		activeErrorPages[i] = &domain.ErrorPage{ErrorCode: info.Code, Enabled: true}
+	}
+
+	content, hostsMap, err := s.generator.Generate(ctx, node, domains, pools, certs, services, authGroups, activeErrorPages)
 	if err != nil {
 		return nil, fmt.Errorf("config: generate: %w", err)
 	}
@@ -89,10 +120,11 @@ func (s *configService) GenerateForNode(ctx context.Context, nodeID int) (*domai
 	hash := hex.EncodeToString(h[:])
 
 	return &domain.GeneratedConfig{
-		NodeID:   nodeID,
-		Content:  content,
-		HostsMap: hostsMap,
-		Hash:     hash,
+		NodeID:     nodeID,
+		Content:    content,
+		HostsMap:   hostsMap,
+		Hash:       hash,
+		ErrorPages: errorPageContent,
 	}, nil
 }
 

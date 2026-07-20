@@ -39,6 +39,25 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build \
 # Menggunakan image sekecil mungkin untuk production.
 # scratch = image kosong, hanya binary + CA certs.
 # ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 2: Seleksi binary aefw-serial sesuai arsitektur target
+# Docker buildx mengisi TARGETARCH dan TARGETVARIANT secara otomatis:
+#   linux/amd64      → TARGETARCH=amd64,  TARGETVARIANT=""
+#   linux/arm64      → TARGETARCH=arm64,  TARGETVARIANT=""
+#   linux/arm/v7     → TARGETARCH=arm,    TARGETVARIANT=v7   (Pi 2/3 32-bit, ARMv7)
+#   linux/arm/v6     → TARGETARCH=arm,    TARGETVARIANT=v6   (Pi Zero / Pi 1)
+#   linux/386        → TARGETARCH=386,    TARGETVARIANT=""
+# ─────────────────────────────────────────────────────────────────────────────
+FROM alpine:3.19 AS serial-picker
+ARG TARGETARCH
+ARG TARGETVARIANT
+COPY bin/ /tmp/bin/
+RUN set -e; \
+    if   [ "${TARGETARCH}" = "arm" ] && [ "${TARGETVARIANT}" = "v6" ]; then BIN=aefw-serial-armv6; \
+    elif [ "${TARGETARCH}" = "arm" ]; then BIN=aefw-serial-armv7; \
+    else BIN=aefw-serial-${TARGETARCH}; fi; \
+    cp /tmp/bin/${BIN} /aefw-serial && chmod +x /aefw-serial
+
 FROM scratch
 
 # CA certificates untuk HTTPS
@@ -46,6 +65,10 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 # Binary hasil build
 COPY --from=builder /build/hapm /hapm
+
+# aefw-serial: verifikasi entitlement premium
+# Pre-built untuk amd64 / arm64 / armv7 / armv6 / 386 — source di Golang/aefw-serial (private)
+COPY --from=serial-picker /aefw-serial /bin/aefw-serial
 
 # Port default aplikasi
 EXPOSE 8282

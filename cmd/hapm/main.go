@@ -71,6 +71,7 @@ func main() {
 	serviceRepo := sqlite.NewServiceRepository(db.SQL())
 	authUserRepo := sqlite.NewAuthUserRepository(db.SQL())
 	authGroupRepo := sqlite.NewAuthGroupRepository(db.SQL())
+	errorPageRepo := sqlite.NewErrorPageRepository(db.SQL())
 
 	// ─── 4. Inisialisasi package eksternal ────────────────────────
 	sshClient := pkgssh.NewClient()
@@ -95,7 +96,7 @@ func main() {
 	certJobSvc := service.NewCertJobService(certJobRepo)
 	distSvc := service.NewDistributionService(cfg, certRepo, certDeployRepo, nodeRepo, certStore, sshClient, auditSvc)
 	schedulerSvc := service.NewSchedulerService(certRepo, certJobRepo, certSvc, distSvc)
-	configSvc := service.NewConfigService(nodeRepo, backendRepo, domainRepo, certRepo, serviceRepo, authGroupRepo, haproxyGen)
+	configSvc := service.NewConfigService(nodeRepo, backendRepo, domainRepo, certRepo, serviceRepo, authGroupRepo, errorPageRepo, settingRepo, haproxyGen)
 	serviceSvc := service.NewServiceService(serviceRepo, backendRepo, auditSvc)
 	revisionSvc := service.NewRevisionService(revisionRepo, auditSvc)
 	deploySvc := service.NewDeployService(cfg, nodeRepo, domainRepo, certRepo, certStore, configSvc, revisionRepo, deployRepo, sshClient, haproxyVal, auditSvc)
@@ -104,6 +105,7 @@ func main() {
 	dashboardSvc := service.NewDashboardService(nodeRepo, domainRepo, backendRepo, serviceRepo, certRepo, deployRepo, auditRepo, monitoringSvc)
 	authUserSvc := service.NewAuthUserService(authUserRepo, auditSvc)
 	authGroupSvc := service.NewAuthGroupService(authGroupRepo, authUserRepo, auditSvc)
+	snSvc := service.NewSNService(settingRepo)
 
 	// Compile-time interface check
 	var _ domain.AuditService = auditSvc
@@ -126,6 +128,7 @@ func main() {
 	var _ domain.DashboardService = dashboardSvc
 	var _ domain.AuthUserService = authUserSvc
 	var _ domain.AuthGroupService = authGroupSvc
+	var _ domain.SNService = snSvc
 
 	// ─── 6. Inisialisasi router ─────────────────────────────────────
 	router := core.NewRouter()
@@ -148,6 +151,8 @@ func main() {
 	handler.RegisterDashboardRoutes(router, cfg, dashboardSvc)
 	handler.RegisterHAProxyAuthRoutes(router, cfg, authUserSvc, authGroupSvc)
 	handler.RegisterAlertRoutes(router, cfg, certRepo, certDeployRepo)
+	handler.RegisterErrorPageRoutes(router, cfg, errorPageRepo, settingsSvc)
+	handler.RegisterLicRoutes(router, cfg, snSvc)
 
 	// ─── 8. Jalankan scheduler CMC ─────────────────────────────────
 	ctx := context.Background()

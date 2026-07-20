@@ -104,6 +104,18 @@ func (s *settingsService) SetACMEStaging(ctx context.Context, staging bool) erro
 	return s.repo.Set(ctx, domain.SettingACMEStaging, strconv.FormatBool(staging), false)
 }
 
+func (s *settingsService) IsCustomErrorPagesEnabled(ctx context.Context) (bool, error) {
+	setting, err := s.repo.Get(ctx, domain.SettingCustomErrorPages)
+	if err != nil {
+		return false, nil // default: disabled
+	}
+	return setting.Value == "true", nil
+}
+
+func (s *settingsService) SetCustomErrorPagesEnabled(ctx context.Context, enabled bool) error {
+	return s.repo.Set(ctx, domain.SettingCustomErrorPages, strconv.FormatBool(enabled), false)
+}
+
 // ─── Cloudflare API helpers ───────────────────────────────────────────────────
 
 type cfTokenResult struct {

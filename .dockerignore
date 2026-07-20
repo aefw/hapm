@@ -4,6 +4,9 @@
 *.env.production
 *.env.staging
 
+# Serial runtime
+*.sn
+
 # Data runtime
 *.db
 *.db-shm

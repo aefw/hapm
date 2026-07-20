@@ -44,7 +44,7 @@ func makeNode(behindCF bool) *domain.Node {
 func generateConfig(t *testing.T, pools []*domain.BackendPool, domains []*domain.DomainEntry) string {
 	t.Helper()
 	g := NewGenerator()
-	cfg, _, err := g.Generate(context.Background(), makeNode(false), domains, pools, nil, nil, nil)
+	cfg, _, err := g.Generate(context.Background(), makeNode(false), domains, pools, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("generate error: %v", err)
 	}

@@ -120,6 +120,13 @@ type SettingRepository interface {
 	Delete(ctx context.Context, key string) error
 }
 
+// ErrorPageRepository mendefinisikan kontrak akses data ErrorPage
+type ErrorPageRepository interface {
+	List(ctx context.Context) ([]*ErrorPage, error)
+	FindByCode(ctx context.Context, code int) (*ErrorPage, error)
+	Update(ctx context.Context, ep *ErrorPage) error
+}
+
 // RevisionRepository mendefinisikan kontrak akses data ConfigRevision
 type RevisionRepository interface {
 	FindByID(ctx context.Context, id int) (*ConfigRevision, error)
@@ -301,7 +308,17 @@ type UpdateNodeRequest struct {
 	SSHPrivateKey        string `json:"ssh_private_key"` // kosong = tidak diubah
 	Description          string `json:"description"`
 	BehindCloudflare     bool   `json:"behind_cloudflare"`
-	HTTPSFrontendEnabled bool   `json:"https_frontend_enabled"` // true = selalu generate frontend https_in
+	HTTPSFrontendEnabled bool   `json:"https_frontend_enabled"`
+	// Statistics page config — disatukan agar cukup 1 request saat simpan node
+	StatsEnabled       bool   `json:"stats_enabled"`
+	StatsBindAddr      string `json:"stats_bind_addr"`
+	StatsPort          int    `json:"stats_port"`
+	StatsURI           string `json:"stats_uri"`
+	StatsRefresh       string `json:"stats_refresh"`
+	StatsHideVersion   bool   `json:"stats_hide_version"`
+	StatsReadOnly      bool   `json:"stats_readonly"`
+	StatsAdmin         bool   `json:"stats_admin"`
+	StatsAllowedGroups []int  `json:"stats_allowed_groups"`
 }
 
 // TestConnectionResult adalah hasil test koneksi SSH ke node
@@ -464,14 +481,17 @@ type SettingsService interface {
 	SetACMEEmail(ctx context.Context, email string) error
 	IsACMEStaging(ctx context.Context) (bool, error)
 	SetACMEStaging(ctx context.Context, staging bool) error
+	IsCustomErrorPagesEnabled(ctx context.Context) (bool, error)
+	SetCustomErrorPagesEnabled(ctx context.Context, enabled bool) error
 }
 
 // GeneratedConfig adalah hasil generate konfigurasi HAProxy
 type GeneratedConfig struct {
-	NodeID   int    `json:"id_nodes"`
-	Content  string `json:"content"`
-	HostsMap string `json:"hosts_map"` // content untuk /etc/haproxy/map/hosts
-	Hash     string `json:"hash"`      // SHA256 dari content
+	NodeID     int            `json:"id_nodes"`
+	Content    string         `json:"content"`
+	HostsMap   string         `json:"hosts_map"`   // content untuk /etc/haproxy/map/hosts
+	Hash       string         `json:"hash"`        // SHA256 dari content
+	ErrorPages map[int]string `json:"-"`           // code → wrapped HTTP content untuk deploy ke node
 }
 
 // ConfigService mendefinisikan kontrak layanan generate konfigurasi

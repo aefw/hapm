@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	"github.com/aefw/hapm/internal/domain"
@@ -18,6 +19,8 @@ func NewNodeRepository(db *sql.DB) *NodeRepository {
 const nodeSelectCols = `SELECT id_nodes, name, hostname, ip_address, ssh_port, ssh_user,
        ssh_private_key, description, status, last_checked, haproxy_version,
        behind_cloudflare, https_frontend_enabled, provision_step, provision_error,
+       stats_enabled, stats_bind_addr, stats_port, stats_uri, stats_refresh,
+       stats_hide_version, stats_readonly, stats_admin, stats_allowed_groups,
        created, timestamp FROM nodes`
 
 func (r *NodeRepository) FindByID(ctx context.Context, id int) (*domain.Node, error) {
@@ -47,6 +50,8 @@ func (r *NodeRepository) List(ctx context.Context, f domain.ListFilter) ([]*doma
 	selectCols := `SELECT id_nodes, name, hostname, ip_address, ssh_port, ssh_user,
 	       ssh_private_key, description, status, last_checked, haproxy_version,
 	       behind_cloudflare, https_frontend_enabled, provision_step, provision_error,
+	       stats_enabled, stats_bind_addr, stats_port, stats_uri, stats_refresh,
+	       stats_hide_version, stats_readonly, stats_admin, stats_allowed_groups,
 	       created, timestamp ` + base + ` ORDER BY name ASC`
 	qArgs := append([]interface{}{}, args...)
 	if f.Limit > 0 {
@@ -85,14 +90,22 @@ func (r *NodeRepository) Create(ctx context.Context, n *domain.Node) (int, error
 }
 
 func (r *NodeRepository) Update(ctx context.Context, n *domain.Node) error {
+	groupsJSON, err := json.Marshal(n.StatsAllowedGroups)
+	if err != nil {
+		groupsJSON = []byte("[]")
+	}
 	q := `UPDATE nodes SET name=?, hostname=?, ip_address=?, ssh_port=?, ssh_user=?,
-	             ssh_private_key=?, description=?, behind_cloudflare=?,
-	             https_frontend_enabled=?, timestamp=CURRENT_TIMESTAMP
+	             ssh_private_key=?, description=?, behind_cloudflare=?, https_frontend_enabled=?,
+	             stats_enabled=?, stats_bind_addr=?, stats_port=?, stats_uri=?, stats_refresh=?,
+	             stats_hide_version=?, stats_readonly=?, stats_admin=?, stats_allowed_groups=?,
+	             timestamp=CURRENT_TIMESTAMP
 	      WHERE id_nodes=?`
-	_, err := r.db.ExecContext(ctx, q,
+	_, err = r.db.ExecContext(ctx, q,
 		n.Name, n.Hostname, n.IPAddress, n.SSHPort, n.SSHUser,
-		n.SSHPrivateKey, n.Description, boolToInt(n.BehindCloudflare),
-		boolToInt(n.HTTPSFrontendEnabled), n.ID)
+		n.SSHPrivateKey, n.Description, boolToInt(n.BehindCloudflare), boolToInt(n.HTTPSFrontendEnabled),
+		boolToInt(n.StatsEnabled), n.StatsBindAddr, n.StatsPort, n.StatsURI, n.StatsRefresh,
+		boolToInt(n.StatsHideVersion), boolToInt(n.StatsReadOnly), boolToInt(n.StatsAdmin),
+		string(groupsJSON), n.ID)
 	return err
 }
 
@@ -121,10 +134,14 @@ func scanNode(s scanner) (*domain.Node, error) {
 	var key, desc, version, provErr sql.NullString
 	var lastChecked sql.NullTime
 	var behindCloudflare, httpsFrontendEnabled int
+	var statsEnabled, statsHideVersion, statsReadOnly, statsAdmin int
+	var statsBindAddr, statsURI, statsRefresh, statsGroupsJSON string
 	err := s.Scan(
 		&n.ID, &n.Name, &n.Hostname, &n.IPAddress, &n.SSHPort, &n.SSHUser,
 		&key, &desc, &n.Status, &lastChecked, &version,
 		&behindCloudflare, &httpsFrontendEnabled, &n.ProvisionStep, &provErr,
+		&statsEnabled, &statsBindAddr, &n.StatsPort, &statsURI, &statsRefresh,
+		&statsHideVersion, &statsReadOnly, &statsAdmin, &statsGroupsJSON,
 		&n.Created, &n.Timestamp,
 	)
 	if err == sql.ErrNoRows {
@@ -142,5 +159,19 @@ func scanNode(s scanner) (*domain.Node, error) {
 	if lastChecked.Valid {
 		n.LastChecked = &lastChecked.Time
 	}
+	n.StatsEnabled = statsEnabled == 1
+	n.StatsBindAddr = statsBindAddr
+	n.StatsURI = statsURI
+	n.StatsRefresh = statsRefresh
+	n.StatsHideVersion = statsHideVersion == 1
+	n.StatsReadOnly = statsReadOnly == 1
+	n.StatsAdmin = statsAdmin == 1
+	if statsGroupsJSON != "" && statsGroupsJSON != "[]" {
+		_ = json.Unmarshal([]byte(statsGroupsJSON), &n.StatsAllowedGroups)
+	}
+	if n.StatsAllowedGroups == nil {
+		n.StatsAllowedGroups = []int{}
+	}
 	return &n, nil
 }
+

@@ -29,6 +29,16 @@ type Node struct {
 	// Provision tracking — diperbarui oleh background goroutine saat provision berjalan
 	ProvisionStep  int    `json:"provision_step"`            // 0=idle, 1-6=in-progress/failed, 7=done
 	ProvisionError string `json:"provision_error,omitempty"` // pesan error jika gagal, kosong jika sukses
+	// Statistics — konfigurasi HAProxy stats page per node
+	StatsEnabled      bool   `json:"stats_enabled"`
+	StatsBindAddr     string `json:"stats_bind_addr"`
+	StatsPort         int    `json:"stats_port"`
+	StatsURI          string `json:"stats_uri"`
+	StatsRefresh      string `json:"stats_refresh"`
+	StatsHideVersion  bool   `json:"stats_hide_version"`
+	StatsReadOnly     bool   `json:"stats_readonly"`
+	StatsAdmin        bool   `json:"stats_admin"`
+	StatsAllowedGroups []int `json:"stats_allowed_groups"` // ID dari auth_groups
 	Created   time.Time `json:"created"`
 	Timestamp time.Time `json:"timestamp"`
 }

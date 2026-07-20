@@ -11,11 +11,20 @@
 
 # ─── Build output ────────────────────────────────────────────────────────────
 /bin/
+!/bin/aefw-serial
+!/bin/aefw-serial-amd64
+!/bin/aefw-serial-arm64
+!/bin/aefw-serial-armv7
+!/bin/aefw-serial-armv6
+!/bin/aefw-serial-386
 /hapm
 /hapm-acme
 /hapm-linux-amd64
 /hapm-linux-arm64
 nohup.out
+
+# ─── Serial files ──────────────────────────────────────────────────────────
+*.sn
 
 # ─── Database files ──────────────────────────────────────────────────────────
 *.db

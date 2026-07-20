@@ -565,6 +565,40 @@ CREATE INDEX IF NOT EXISTS idx_domains_cert_uuid ON domains(cert_uuid);
 		sql: `ALTER TABLE nodes ADD COLUMN provision_step  INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE nodes ADD COLUMN provision_error TEXT    NOT NULL DEFAULT ''`,
 	},
+	{
+		version: 35,
+		name:    "create_error_pages",
+		// Tabel menyimpan custom HTML untuk setiap HTTP error code.
+		// enabled=0 default — error page tidak aktif sampai user mengisi konten dan mengaktifkan.
+		// Pre-populate semua 8 error code yang didukung HAProxy errorfile.
+		sql: `
+CREATE TABLE IF NOT EXISTS error_pages (
+    id_error_pages INTEGER  PRIMARY KEY AUTOINCREMENT,
+    error_code     INTEGER  NOT NULL UNIQUE,
+    content        TEXT     NOT NULL DEFAULT '',
+    enabled        INTEGER  NOT NULL DEFAULT 0,
+    created        DATETIME DEFAULT CURRENT_TIMESTAMP,
+    timestamp      DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+INSERT OR IGNORE INTO error_pages (error_code) VALUES (400),(403),(404),(408),(500),(502),(503),(504);
+`,
+	},
+	{
+		version: 36,
+		name:    "nodes_add_stats",
+		// Konfigurasi HAProxy statistics page per node.
+		// stats_allowed_groups: JSON array berisi ID dari auth_groups.
+		// stats_hide_version: default 1 (aman — tidak menampilkan versi HAProxy).
+		sql: `ALTER TABLE nodes ADD COLUMN stats_enabled       INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE nodes ADD COLUMN stats_bind_addr     TEXT    NOT NULL DEFAULT '127.0.0.1';
+ALTER TABLE nodes ADD COLUMN stats_port          INTEGER NOT NULL DEFAULT 8404;
+ALTER TABLE nodes ADD COLUMN stats_uri           TEXT    NOT NULL DEFAULT '/stats';
+ALTER TABLE nodes ADD COLUMN stats_refresh       TEXT    NOT NULL DEFAULT '10s';
+ALTER TABLE nodes ADD COLUMN stats_hide_version  INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE nodes ADD COLUMN stats_readonly      INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE nodes ADD COLUMN stats_admin         INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE nodes ADD COLUMN stats_allowed_groups TEXT   NOT NULL DEFAULT '[]'`,
+	},
 }
 
 // RunMigrations menjalankan semua migrasi yang belum diaplikasikan.
