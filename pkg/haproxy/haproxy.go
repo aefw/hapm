@@ -102,7 +102,7 @@ func (g *generator) Generate(
 	sb.WriteString("    timeout server   50s\n")
 	sb.WriteString("    timeout tunnel 3600s\n")
 	for _, ep := range errorPages {
-		if ep.Enabled && strings.TrimSpace(ep.Content) != "" {
+		if ep.Enabled {
 			sb.WriteString(fmt.Sprintf("    errorfile %d /etc/haproxy/errors/%d.http\n", ep.ErrorCode, ep.ErrorCode))
 		}
 	}
