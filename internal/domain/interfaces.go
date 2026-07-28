@@ -127,6 +127,15 @@ type ErrorPageRepository interface {
 	Update(ctx context.Context, ep *ErrorPage) error
 }
 
+// WAFRuleRepository mendefinisikan kontrak akses data WAFRule
+type WAFRuleRepository interface {
+	List(ctx context.Context) ([]*WAFRule, error)
+	FindByID(ctx context.Context, id int) (*WAFRule, error)
+	Create(ctx context.Context, rule *WAFRule) error
+	Update(ctx context.Context, rule *WAFRule) error
+	Delete(ctx context.Context, id int) error
+}
+
 // RevisionRepository mendefinisikan kontrak akses data ConfigRevision
 type RevisionRepository interface {
 	FindByID(ctx context.Context, id int) (*ConfigRevision, error)
@@ -483,6 +492,8 @@ type SettingsService interface {
 	SetACMEStaging(ctx context.Context, staging bool) error
 	IsCustomErrorPagesEnabled(ctx context.Context) (bool, error)
 	SetCustomErrorPagesEnabled(ctx context.Context, enabled bool) error
+	IsWAFEnabled(ctx context.Context) (bool, error)
+	SetWAFEnabled(ctx context.Context, enabled bool) error
 }
 
 // GeneratedConfig adalah hasil generate konfigurasi HAProxy

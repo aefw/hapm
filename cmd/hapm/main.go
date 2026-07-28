@@ -72,6 +72,7 @@ func main() {
 	authUserRepo := sqlite.NewAuthUserRepository(db.SQL())
 	authGroupRepo := sqlite.NewAuthGroupRepository(db.SQL())
 	errorPageRepo := sqlite.NewErrorPageRepository(db.SQL())
+	wafRuleRepo := sqlite.NewWAFRuleRepository(db.SQL())
 
 	// ─── 4. Inisialisasi package eksternal ────────────────────────
 	sshClient := pkgssh.NewClient()
@@ -152,6 +153,7 @@ func main() {
 	handler.RegisterHAProxyAuthRoutes(router, cfg, authUserSvc, authGroupSvc)
 	handler.RegisterAlertRoutes(router, cfg, certRepo, certDeployRepo)
 	handler.RegisterErrorPageRoutes(router, cfg, errorPageRepo, settingsSvc)
+	handler.RegisterWAFRoutes(router, cfg, wafRuleRepo, settingsSvc)
 	handler.RegisterLicRoutes(router, cfg, snSvc)
 
 	// ─── 8. Jalankan scheduler CMC ─────────────────────────────────

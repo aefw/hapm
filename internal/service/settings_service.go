@@ -116,6 +116,18 @@ func (s *settingsService) SetCustomErrorPagesEnabled(ctx context.Context, enable
 	return s.repo.Set(ctx, domain.SettingCustomErrorPages, strconv.FormatBool(enabled), false)
 }
 
+func (s *settingsService) IsWAFEnabled(ctx context.Context) (bool, error) {
+	setting, err := s.repo.Get(ctx, domain.SettingWAFEnabled)
+	if err != nil {
+		return false, nil // default: disabled
+	}
+	return setting.Value == "true", nil
+}
+
+func (s *settingsService) SetWAFEnabled(ctx context.Context, enabled bool) error {
+	return s.repo.Set(ctx, domain.SettingWAFEnabled, strconv.FormatBool(enabled), false)
+}
+
 // ─── Cloudflare API helpers ───────────────────────────────────────────────────
 
 type cfTokenResult struct {

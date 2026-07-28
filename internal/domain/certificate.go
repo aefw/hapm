@@ -141,8 +141,9 @@ type Setting struct {
 }
 
 const (
-	SettingCFAPIToken        = "cloudflare.api_token"
-	SettingACMEEmail         = "acme.email"
-	SettingACMEStaging       = "acme.staging"
-	SettingCustomErrorPages  = "features.custom_error_pages"
+	SettingCFAPIToken       = "cloudflare.api_token"
+	SettingACMEEmail        = "acme.email"
+	SettingACMEStaging      = "acme.staging"
+	SettingCustomErrorPages = "features.custom_error_pages"
+	SettingWAFEnabled       = "features.waf"
 )

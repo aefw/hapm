@@ -93,6 +93,9 @@ func (s *snService) activateFromFile(ctx context.Context, filePath string) (*dom
 	if err := s.settingRepo.Set(ctx, domain.SettingCustomErrorPages, "true", false); err != nil {
 		return result, fmt.Errorf("gagal mengaktifkan fitur premium: %w", err)
 	}
+	if err := s.settingRepo.Set(ctx, domain.SettingWAFEnabled, "true", false); err != nil {
+		return result, fmt.Errorf("gagal mengaktifkan fitur WAF: %w", err)
+	}
 	result.PremiumEnabled = true
 	return result, nil
 }

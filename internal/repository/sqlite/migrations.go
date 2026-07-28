@@ -599,6 +599,24 @@ ALTER TABLE nodes ADD COLUMN stats_readonly      INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE nodes ADD COLUMN stats_admin         INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE nodes ADD COLUMN stats_allowed_groups TEXT   NOT NULL DEFAULT '[]'`,
 	},
+	{
+		version: 37,
+		name:    "create_waf_rules",
+		// Tabel menyimpan aturan WAF yang diterapkan ke HAProxy ACL.
+		// rule_type: ip_block | path_block | ua_block | header_block
+		// action: deny | allow
+		sql: `
+CREATE TABLE IF NOT EXISTS waf_rules (
+    id_waf_rules INTEGER  PRIMARY KEY AUTOINCREMENT,
+    name         TEXT     NOT NULL DEFAULT '',
+    rule_type    TEXT     NOT NULL DEFAULT 'ip_block',
+    value        TEXT     NOT NULL DEFAULT '',
+    action       TEXT     NOT NULL DEFAULT 'deny',
+    enabled      INTEGER  NOT NULL DEFAULT 1,
+    created      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    timestamp    DATETIME DEFAULT CURRENT_TIMESTAMP
+)`,
+	},
 }
 
 // RunMigrations menjalankan semua migrasi yang belum diaplikasikan.
