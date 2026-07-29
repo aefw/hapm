@@ -20,4 +20,7 @@ type SNService interface {
 
 	// Status membaca file lokal tanpa mengunduh.
 	Status(ctx context.Context) (*SNResult, error)
+
+	// Remove menghapus file lisensi dan menonaktifkan semua fitur premium.
+	Remove(ctx context.Context) error
 }

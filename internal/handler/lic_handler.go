@@ -20,6 +20,7 @@ func RegisterLicRoutes(router *core.Router, cfg *config.Config, svc domain.SNSer
 	h := &licHandler{cfg: cfg, svc: svc}
 	router.GET("/api/v1/sn", middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleAdmin, h.Status)))
 	router.POST("/api/v1/sn/activate", middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleSuperAdmin, h.Activate)))
+	router.DELETE("/api/v1/sn", middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleSuperAdmin, h.Remove)))
 }
 
 // GET /api/v1/sn — status file lokal tanpa mengunduh (Admin+)
@@ -30,6 +31,15 @@ func (h *licHandler) Status(w http.ResponseWriter, r *http.Request, _ []string) 
 		return
 	}
 	core.Success(w, "sn", result)
+}
+
+// DELETE /api/v1/sn — hapus file lisensi dan nonaktifkan semua fitur premium (SuperAdmin)
+func (h *licHandler) Remove(w http.ResponseWriter, r *http.Request, _ []string) {
+	if err := h.svc.Remove(r.Context()); err != nil {
+		core.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	core.Success(w, "message", "Lisensi berhasil dihapus")
 }
 
 // POST /api/v1/sn/activate — unduh license menggunakan kode, aktifkan jika valid (SuperAdmin)

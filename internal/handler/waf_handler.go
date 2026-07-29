@@ -16,6 +16,7 @@ type WAFHandler struct {
 	cfg         *config.Config
 	repo        domain.WAFRuleRepository
 	settingsSvc domain.SettingsService
+	snSvc       domain.SNService
 }
 
 func RegisterWAFRoutes(
@@ -23,8 +24,9 @@ func RegisterWAFRoutes(
 	cfg *config.Config,
 	repo domain.WAFRuleRepository,
 	settingsSvc domain.SettingsService,
+	snSvc domain.SNService,
 ) {
-	h := &WAFHandler{cfg: cfg, repo: repo, settingsSvc: settingsSvc}
+	h := &WAFHandler{cfg: cfg, repo: repo, settingsSvc: settingsSvc, snSvc: snSvc}
 	router.GET("/api/v1/waf/rules", middleware.RequireAuth(cfg, h.List))
 	router.POST("/api/v1/waf/rules", middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleAdmin, h.Create)))
 	router.PUT("/api/v1/waf/rules/{id}", middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleAdmin, h.Update)))
@@ -213,6 +215,14 @@ func (h *WAFHandler) SetFeature(w http.ResponseWriter, r *http.Request, _ []stri
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		core.Error(w, http.StatusBadRequest, "Request body tidak valid")
 		return
+	}
+
+	if req.Enabled {
+		status, err := h.snSvc.Status(ctx)
+		if err != nil || !status.HasFile || !status.IsValid || status.IsExpired || !status.HasModule {
+			core.Error(w, http.StatusForbidden, "Fitur WAF memerlukan lisensi aktif. Aktifkan lisensi terlebih dahulu.")
+			return
+		}
 	}
 
 	if err := h.settingsSvc.SetWAFEnabled(ctx, req.Enabled); err != nil {

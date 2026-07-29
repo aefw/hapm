@@ -617,6 +617,73 @@ CREATE TABLE IF NOT EXISTS waf_rules (
     timestamp    DATETIME DEFAULT CURRENT_TIMESTAMP
 )`,
 	},
+	{
+		version: 38,
+		name:    "create_waf_blacklist",
+		sql: `
+CREATE TABLE IF NOT EXISTS waf_blacklist (
+    id         INTEGER  PRIMARY KEY AUTOINCREMENT,
+    ip_address TEXT     NOT NULL,
+    reason     TEXT     NOT NULL DEFAULT '',
+    expires_at DATETIME NULL,
+    created    DATETIME DEFAULT CURRENT_TIMESTAMP,
+    timestamp  DATETIME DEFAULT CURRENT_TIMESTAMP
+)`,
+	},
+	{
+		version: 39,
+		name:    "create_waf_whitelist",
+		sql: `
+CREATE TABLE IF NOT EXISTS waf_whitelist (
+    id          INTEGER  PRIMARY KEY AUTOINCREMENT,
+    ip_address  TEXT     NOT NULL UNIQUE,
+    description TEXT     NOT NULL DEFAULT '',
+    created     DATETIME DEFAULT CURRENT_TIMESTAMP,
+    timestamp   DATETIME DEFAULT CURRENT_TIMESTAMP
+)`,
+	},
+	{
+		version: 40,
+		name:    "create_waf_rate_limits",
+		sql: `
+CREATE TABLE IF NOT EXISTS waf_rate_limits (
+    id                       INTEGER  PRIMARY KEY AUTOINCREMENT,
+    name                     TEXT     NOT NULL DEFAULT '',
+    path_pattern             TEXT     NOT NULL DEFAULT '',
+    max_requests             INTEGER  NOT NULL DEFAULT 10,
+    window_seconds           INTEGER  NOT NULL DEFAULT 60,
+    block_duration_seconds   INTEGER  NOT NULL DEFAULT 300,
+    auto_blacklist_threshold INTEGER  NULL,
+    enabled                  INTEGER  NOT NULL DEFAULT 1,
+    created                  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    timestamp                DATETIME DEFAULT CURRENT_TIMESTAMP
+)`,
+	},
+	{
+		version: 41,
+		name:    "create_waf_cors_rules",
+		sql: `
+CREATE TABLE IF NOT EXISTS waf_cors_rules (
+    id                INTEGER  PRIMARY KEY AUTOINCREMENT,
+    name              TEXT     NOT NULL DEFAULT '',
+    path_pattern      TEXT     NOT NULL DEFAULT '',
+    allowed_origins   TEXT     NOT NULL DEFAULT '["*"]',
+    allowed_methods   TEXT     NOT NULL DEFAULT 'GET,POST,PUT,DELETE,OPTIONS',
+    allowed_headers   TEXT     NOT NULL DEFAULT 'Content-Type,Authorization',
+    expose_headers    TEXT     NOT NULL DEFAULT '',
+    allow_credentials INTEGER  NOT NULL DEFAULT 0,
+    max_age_seconds   INTEGER  NOT NULL DEFAULT 3600,
+    enabled           INTEGER  NOT NULL DEFAULT 1,
+    priority          INTEGER  NOT NULL DEFAULT 0,
+    created           DATETIME DEFAULT CURRENT_TIMESTAMP,
+    timestamp         DATETIME DEFAULT CURRENT_TIMESTAMP
+)`,
+	},
+	{
+		version: 42,
+		name:    "add_expires_at_to_waf_whitelist",
+		sql:     `ALTER TABLE waf_whitelist ADD COLUMN expires_at DATETIME NULL`,
+	},
 }
 
 // RunMigrations menjalankan semua migrasi yang belum diaplikasikan.

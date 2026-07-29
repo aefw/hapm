@@ -17,9 +17,11 @@
 4. [API Specification](#api-specification) — termasuk [CMC](#certificate-management-center-cmc), [Domain Authentication](#domain-authentication-haproxy-userlist), [Settings](#settings-endpoints)
 5. [Certificate Management Center (CMC)](#certificate-management-center-cmc)
 6. [Backend HTTPS & Forward Headers](#backend-https--forward-headers)
-7. [Security Design](#security-design)
-8. [Docker Deployment Plan](#docker-deployment-plan)
-9. [Development Task List](#development-task-list)
+7. [Node Statistics Management](#node-statistics-management)
+8. [Custom Error Pages](#custom-error-pages)
+9. [Security Design](#security-design)
+10. [Docker Deployment Plan](#docker-deployment-plan)
+11. [Development Task List](#development-task-list)
 
 ---
 
@@ -866,6 +868,39 @@ Frontend dapat polling endpoint ini untuk menampilkan badge notifikasi. Alert hi
 
 ---
 
+### Error Pages Endpoints
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/api/v1/error-pages` | Admin+ | List semua konfigurasi error page (8 kode) |
+| PUT | `/api/v1/error-pages/{code}` | Admin+ | Update konten HTML error page |
+| GET | `/api/v1/settings/features/error-pages` | Auth | Cek status fitur Custom Error Pages |
+| PUT | `/api/v1/settings/features/error-pages` | SuperAdmin | Enable/disable fitur Custom Error Pages |
+
+**GET /api/v1/error-pages** → Response:
+```json
+{
+  "data": [
+    { "id_error_pages": 1, "error_code": 400, "content": "<html>...</html>", "enabled": true, "timestamp": "..." },
+    { "id_error_pages": 2, "error_code": 403, "content": "", "enabled": false, "timestamp": "..." }
+  ]
+}
+```
+
+**PUT /api/v1/error-pages/{code}**
+```json
+{ "content": "<html><body>Custom 404 page</body></html>", "enabled": true }
+```
+
+> Kode yang didukung: `400`, `403`, `404`, `408`, `500`, `502`, `503`, `504`. Feature harus aktif untuk bisa menyimpan konten.
+
+**PUT /api/v1/settings/features/error-pages** (SuperAdmin)
+```json
+{ "enabled": true }
+```
+
+---
+
 ### Settings Endpoints
 
 | Method | Path | Role | Description |
@@ -952,6 +987,149 @@ Hanya berlaku jika `protocol=https`.
 | Backend dengan Let's Encrypt | `https` | `trusted` | `true` |
 | Database (MySQL, PG, Redis) | `tcp` | — | `false` |
 | SSH cluster | `tcp` | — | `false` |
+
+---
+
+## Node Statistics Management
+
+HAPM mendukung pengelolaan **HAProxy statistics page** per node secara terpusat. Konfigurasi disimpan di DB dan diintegrasikan ke dalam `haproxy.cfg` saat Deploy Configuration dijalankan.
+
+### Konsep
+
+- Setiap node dapat memiliki konfigurasi statistics page independen
+- Autentikasi menggunakan **RBAC Domain Auth** — memanfaatkan `auth_groups` yang sudah ada, **bukan** user sistem HAPM
+- HAPM secara otomatis membangun `userlist hapm_stats` dari anggota group yang dipilih saat generate config
+- Tidak ada input username/password manual — sepenuhnya dari RBAC
+
+### Konfigurasi Statistics Page
+
+Konfigurasi statistics disatukan ke endpoint node yang sudah ada — **`PUT /api/v1/nodes/{id}`** menerima field stats bersama field node lainnya, dan **`GET /api/v1/nodes/{id}`** sudah mengembalikan semua field stats. Tidak ada endpoint terpisah.
+
+**Field stats dalam `PUT /api/v1/nodes/{id}`**
+
+```json
+{
+  "stats_enabled": true,
+  "stats_bind_addr": "127.0.0.1",
+  "stats_port": 8404,
+  "stats_uri": "/stats",
+  "stats_refresh": "10s",
+  "stats_hide_version": true,
+  "stats_readonly": false,
+  "stats_admin": false,
+  "stats_allowed_groups": [1, 2]
+}
+```
+
+| Field | Default | Keterangan |
+|---|---|---|
+| `stats_enabled` | `false` | Aktifkan/nonaktifkan statistics page |
+| `stats_bind_addr` | `127.0.0.1` | Alamat bind (`127.0.0.1` atau `0.0.0.0`) |
+| `stats_port` | `8404` | Port statistics page |
+| `stats_uri` | `/stats` | URI path statistics page |
+| `stats_refresh` | `10s` | Auto-refresh interval (format: `5s`, `10s`, `30s`) |
+| `stats_hide_version` | `true` | Sembunyikan versi HAProxy di halaman stats |
+| `stats_readonly` | `false` | Mode read-only (nonaktifkan aksi admin dari UI stats) |
+| `stats_admin` | `false` | Izinkan admin commands dari UI stats (hanya aktif jika `stats_readonly=false`) |
+| `stats_allowed_groups` | `[]` | Array ID `auth_groups` yang anggotanya boleh akses stats page |
+
+### Contoh HAProxy Config yang Dihasilkan
+
+```haproxy
+userlist hapm_stats
+    user alice password $2y$10$...bcrypt_hash...
+    user bob   password $2y$10$...bcrypt_hash...
+
+listen stats
+    bind 127.0.0.1:8404
+    stats enable
+    stats uri /stats
+    stats refresh 10s
+    stats hide-version
+    stats realm "HAPM Statistics"
+
+    http-request auth realm "HAPM Statistics" unless { http_auth(hapm_stats) }
+```
+
+> Jika `stats_admin=true` dan `stats_readonly=false`, ditambahkan: `stats admin if TRUE`
+
+### Alur Integrasi RBAC
+
+1. Pilih satu atau lebih `auth_groups` di konfigurasi statistics node
+2. Saat **Deploy Configuration**, generator membaca semua anggota group yang dipilih dari tabel `auth_users`
+3. User yang terdaftar di lebih dari satu group hanya dimasukkan sekali ke `userlist hapm_stats` (deduplikasi otomatis)
+4. Password hash (bcrypt format, kompatibel HAProxy) diambil langsung dari kolom `password_hash` di `auth_users`
+5. Blok `listen stats` + `userlist hapm_stats` digenerate di akhir `haproxy.cfg`
+
+---
+
+## Custom Error Pages
+
+HAPM mendukung kustomisasi **halaman error HAProxy** (4xx/5xx) yang dapat dikelola langsung dari UI. Fitur ini bersifat **premium** dan harus diaktifkan oleh SuperAdmin.
+
+### Konsep
+
+- 8 kode error didukung: `400`, `403`, `404`, `408`, `500`, `502`, `503`, `504`
+- Konten HTML disimpan di database per kode
+- Saat Deploy Configuration, file `.http` di-upload ke node (`/etc/haproxy/errors/`)
+- Directive `errorfile` otomatis digenerate di bagian `defaults` pada `haproxy.cfg`
+
+### Feature Flag
+
+Fitur dikontrol via setting `features.custom_error_pages`:
+
+```
+GET  /api/v1/settings/features/error-pages   → { "enabled": false }
+PUT  /api/v1/settings/features/error-pages   → { "enabled": true }  (SuperAdmin only)
+```
+
+Jika feature **nonaktif**: halaman Error Pages terkunci di UI, tombol edit dinonaktifkan, dan tidak ada `errorfile` yang digenerate saat deploy.
+
+### Editor UI
+
+- Halaman `/settings/error-pages` di frontend
+- Editor HTML berbasis **CodeMirror 6** (syntax highlighting, line numbers, search/replace, undo/redo)
+- Tombol Preview untuk render HTML di tab baru
+- Enable/disable per kode error secara individual
+- Hanya kode yang `enabled=true` dan memiliki konten yang di-deploy
+
+### Format File HAProxy Error
+
+File yang di-upload ke node mengikuti format HTTP/1.0 response mentah:
+
+```
+HTTP/1.0 404 Not Found\r\n
+Content-Type: text/html; charset=utf-8\r\n
+Content-Length: <n>\r\n
+\r\n
+<html>...</html>
+```
+
+> HAPM membungkus konten HTML otomatis ke dalam format ini saat deploy. Anda cukup memasukkan HTML biasa di editor.
+
+### Contoh HAProxy Config yang Dihasilkan
+
+```haproxy
+defaults
+    ...
+    errorfile 400 /etc/haproxy/errors/400.http
+    errorfile 403 /etc/haproxy/errors/403.http
+    errorfile 404 /etc/haproxy/errors/404.http
+    errorfile 500 /etc/haproxy/errors/500.http
+    errorfile 502 /etc/haproxy/errors/502.http
+    errorfile 503 /etc/haproxy/errors/503.http
+    errorfile 504 /etc/haproxy/errors/504.http
+```
+
+### Pipeline Deploy Error Pages
+
+1. Config generator membaca semua error page yang `enabled=true` dan memiliki konten dari DB
+2. Konten HTML dibungkus ke format HTTP response dan disimpan di `GeneratedConfig.ErrorPages`
+3. Stage 4 deploy pipeline (sebelum upload `haproxy.cfg`):
+   - Buat direktori `sudo mkdir -p /etc/haproxy/errors/`
+   - Upload tiap file ke `/tmp/hapm_error_{code}.http` via SSH
+   - `sudo mv /tmp/hapm_error_{code}.http /etc/haproxy/errors/{code}.http`
+4. Directive `errorfile` otomatis termasuk di `haproxy.cfg` yang diupload
 
 ---
 
@@ -1101,6 +1279,7 @@ Viewer     → read-only
 /ssl/:uuid → Certificate detail + jobs + deployments
 /ssl/:uuid/deploy → Deploy wizard (pilih node atau semua)
 /settings → System settings (Cloudflare, ACME)
+/settings/error-pages → Custom Error Pages (premium, editor CodeMirror 6)
 /config/:node_id → Config preview
 /deploy/:node_id → Deploy wizard
 /revisions/:node_id → Revision history + diff viewer
@@ -1211,7 +1390,7 @@ docker compose up -d
 
 ### Sprint 2 — Database ✅
 - [x] SQLite WAL mode, MaxOpenConns=10
-- [x] Migration runner (v1–v32)
+- [x] Migration runner (v1–v36)
 - [x] Semua repository interfaces + SQLite implementations
 
 ### Sprint 3 — Domain + Auth ✅
@@ -1280,6 +1459,29 @@ docker compose up -d
 - [x] Generator HAProxy: generate `frontend https_in` jika `hasSSLTerminate || node.HTTPSFrontendEnabled`
 - [x] Deploy pipeline: push semua SSL cert aktif ke node sebelum `haproxy -c` (validasi) dan reload
 - [x] Cert push otomatis di `deployService.pushCertsToNode()` — non-fatal, paralel per cert UUID
+
+### Sprint 11 — Custom Error Pages + Node Statistics Management ✅
+- [x] **Custom Error Pages**
+  - [x] Migration v35: tabel `error_pages`, pre-populate 8 kode (400/403/404/408/500/502/503/504)
+  - [x] `internal/domain/error_page.go` — `ErrorPage`, `SupportedErrorCodes`, `WrapHTTPResponse()`
+  - [x] `internal/repository/sqlite/error_page_repo.go` — `ErrorPageRepository` (List, FindByCode, Update)
+  - [x] Feature flag `features.custom_error_pages` di tabel `settings`
+  - [x] `SettingsService.IsCustomErrorPagesEnabled()` / `SetCustomErrorPagesEnabled()`
+  - [x] `internal/handler/error_page_handler.go` — REST endpoints Error Pages + feature flag
+  - [x] Generator HAProxy: `errorfile` directive otomatis di seksi `defaults`
+  - [x] Deploy pipeline Stage 4: upload `.http` files ke `/etc/haproxy/errors/` via SSH
+  - [x] Frontend `/settings/error-pages` — editor CodeMirror 6, locked state jika feature disabled
+  - [x] `src/services/error-page.service.js`
+- [x] **Node Statistics Management**
+  - [x] Migration v36: 9 kolom `stats_*` pada tabel `nodes`
+  - [x] 9 field stats pada `domain.Node` + `domain.NodeStatsConfig`
+  - [x] `node_repo.go`: scan stats columns, `UpdateStatsConfig()`, JSON marshal untuk `stats_allowed_groups`
+  - [x] `NodeService.GetStatsConfig()` / `UpdateStatsConfig()`
+  - [x] Stats fields disatukan ke `PUT /api/v1/nodes/{id}` — tidak ada endpoint terpisah
+  - [x] Generator HAProxy: `userlist hapm_stats` + `listen stats` block dengan deduplikasi user antar-group
+  - [x] RBAC integration: password hash diambil langsung dari `auth_users` (HAProxy bcrypt format)
+  - [x] Frontend section Statistics di halaman Edit Node (edit mode only)
+  - [x] `node.service.js` — `getStats()` / `updateStats()` ke endpoint `stats-config`
 
 ---
 

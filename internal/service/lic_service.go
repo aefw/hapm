@@ -63,6 +63,7 @@ func (s *snService) Activate(ctx context.Context, code string) (*domain.SNResult
 }
 
 // Status membaca file lokal tanpa mengunduh dari server.
+// Jika lisensi valid, setting fitur yang belum ada di DB di-sync otomatis (lazy migration).
 func (s *snService) Status(ctx context.Context) (*domain.SNResult, error) {
 	if _, err := s.readFile(); err != nil {
 		return &domain.SNResult{HasFile: false}, nil
@@ -71,7 +72,21 @@ func (s *snService) Status(ctx context.Context) (*domain.SNResult, error) {
 	if err != nil {
 		return &domain.SNResult{HasFile: true, IsValid: false}, nil
 	}
+	if result.IsValid && !result.IsExpired && result.HasModule {
+		s.syncMissingFeatureFlags(ctx)
+	}
 	return result, nil
+}
+
+// syncMissingFeatureFlags mengaktifkan setting fitur yang belum pernah ditulis ke DB.
+// Setting yang sudah ada (aktif maupun nonaktif) tidak diubah.
+func (s *snService) syncMissingFeatureFlags(ctx context.Context) {
+	keys := []string{domain.SettingCustomErrorPages, domain.SettingWAFEnabled}
+	for _, key := range keys {
+		if _, err := s.settingRepo.Get(ctx, key); err != nil {
+			_ = s.settingRepo.Set(ctx, key, "true", false)
+		}
+	}
 }
 
 func (s *snService) activateFromFile(ctx context.Context, filePath string) (*domain.SNResult, error) {
@@ -173,6 +188,14 @@ func (s *snService) downloadFromServer(code string) (string, error) {
 		return "", fmt.Errorf("response tidak valid")
 	}
 	return string(body), nil
+}
+
+// Remove menghapus file lisensi dan menonaktifkan semua fitur premium.
+func (s *snService) Remove(ctx context.Context) error {
+	_ = os.Remove(s.filePath())
+	_ = s.settingRepo.Set(ctx, domain.SettingCustomErrorPages, "false", false)
+	_ = s.settingRepo.Set(ctx, domain.SettingWAFEnabled, "false", false)
+	return nil
 }
 
 func (s *snService) readFile() (string, error) {

@@ -16,6 +16,7 @@ type ErrorPageHandler struct {
 	cfg         *config.Config
 	repo        domain.ErrorPageRepository
 	settingsSvc domain.SettingsService
+	snSvc       domain.SNService
 }
 
 func RegisterErrorPageRoutes(
@@ -23,17 +24,16 @@ func RegisterErrorPageRoutes(
 	cfg *config.Config,
 	repo domain.ErrorPageRepository,
 	settingsSvc domain.SettingsService,
+	snSvc domain.SNService,
 ) {
-	h := &ErrorPageHandler{cfg: cfg, repo: repo, settingsSvc: settingsSvc}
+	h := &ErrorPageHandler{cfg: cfg, repo: repo, settingsSvc: settingsSvc, snSvc: snSvc}
 	router.GET("/api/v1/error-pages", middleware.RequireAuth(cfg, h.List))
 	router.PUT("/api/v1/error-pages/{code}", middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleAdmin, h.Update)))
-	// Feature toggle — path terpisah untuk menghindari konflik dengan /{code}
 	router.GET("/api/v1/settings/features/error-pages", middleware.RequireAuth(cfg, h.GetFeature))
 	router.PUT("/api/v1/settings/features/error-pages", middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleSuperAdmin, h.SetFeature)))
 }
 
 // GET /api/v1/error-pages
-// Mengembalikan semua error pages beserta status fitur premium.
 func (h *ErrorPageHandler) List(w http.ResponseWriter, r *http.Request, _ []string) {
 	ctx := r.Context()
 
@@ -56,8 +56,6 @@ type updateErrorPageRequest struct {
 }
 
 // PUT /api/v1/error-pages/{code}
-// Update konten dan status aktif untuk satu error code.
-// Fitur harus aktif sebelum bisa menyimpan perubahan.
 func (h *ErrorPageHandler) Update(w http.ResponseWriter, r *http.Request, params []string) {
 	ctx := r.Context()
 
@@ -102,7 +100,6 @@ func (h *ErrorPageHandler) Update(w http.ResponseWriter, r *http.Request, params
 }
 
 // GET /api/v1/settings/features/error-pages
-// Mengembalikan status fitur custom error pages.
 func (h *ErrorPageHandler) GetFeature(w http.ResponseWriter, r *http.Request, _ []string) {
 	ctx := r.Context()
 	enabled, _ := h.settingsSvc.IsCustomErrorPagesEnabled(ctx)
@@ -112,19 +109,26 @@ func (h *ErrorPageHandler) GetFeature(w http.ResponseWriter, r *http.Request, _ 
 	})
 }
 
-type setFeatureRequest struct {
+type epSetFeatureRequest struct {
 	Enabled bool `json:"enabled"`
 }
 
 // PUT /api/v1/settings/features/error-pages
-// Toggle fitur custom error pages. Hanya superadmin.
 func (h *ErrorPageHandler) SetFeature(w http.ResponseWriter, r *http.Request, _ []string) {
 	ctx := r.Context()
 
-	var req setFeatureRequest
+	var req epSetFeatureRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		core.Error(w, http.StatusBadRequest, "Request body tidak valid")
 		return
+	}
+
+	if req.Enabled {
+		status, err := h.snSvc.Status(ctx)
+		if err != nil || !status.HasFile || !status.IsValid || status.IsExpired || !status.HasModule {
+			core.Error(w, http.StatusForbidden, "Fitur Custom Error Pages memerlukan lisensi aktif. Aktifkan lisensi terlebih dahulu.")
+			return
+		}
 	}
 
 	if err := h.settingsSvc.SetCustomErrorPagesEnabled(ctx, req.Enabled); err != nil {

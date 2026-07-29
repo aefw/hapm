@@ -71,8 +71,12 @@ func main() {
 	serviceRepo := sqlite.NewServiceRepository(db.SQL())
 	authUserRepo := sqlite.NewAuthUserRepository(db.SQL())
 	authGroupRepo := sqlite.NewAuthGroupRepository(db.SQL())
-	errorPageRepo := sqlite.NewErrorPageRepository(db.SQL())
-	wafRuleRepo := sqlite.NewWAFRuleRepository(db.SQL())
+	errorPageRepo    := sqlite.NewErrorPageRepository(db.SQL())
+	wafRuleRepo      := sqlite.NewWAFRuleRepository(db.SQL())
+	wafBlacklistRepo := sqlite.NewWAFBlacklistRepository(db.SQL())
+	wafWhitelistRepo := sqlite.NewWAFWhitelistRepository(db.SQL())
+	wafRateLimitRepo := sqlite.NewWAFRateLimitRepository(db.SQL())
+	wafCORSRepo      := sqlite.NewWAFCORSRepository(db.SQL())
 
 	// ─── 4. Inisialisasi package eksternal ────────────────────────
 	sshClient := pkgssh.NewClient()
@@ -106,7 +110,12 @@ func main() {
 	dashboardSvc := service.NewDashboardService(nodeRepo, domainRepo, backendRepo, serviceRepo, certRepo, deployRepo, auditRepo, monitoringSvc)
 	authUserSvc := service.NewAuthUserService(authUserRepo, auditSvc)
 	authGroupSvc := service.NewAuthGroupService(authGroupRepo, authUserRepo, auditSvc)
-	snSvc := service.NewSNService(settingRepo)
+	snSvc  := service.NewSNService(settingRepo)
+	wafEngine := middleware.NewWAFEngine(
+		cfg, settingsSvc,
+		wafBlacklistRepo, wafWhitelistRepo,
+		wafRateLimitRepo, wafRuleRepo, wafCORSRepo,
+	)
 
 	// Compile-time interface check
 	var _ domain.AuditService = auditSvc
@@ -152,8 +161,12 @@ func main() {
 	handler.RegisterDashboardRoutes(router, cfg, dashboardSvc)
 	handler.RegisterHAProxyAuthRoutes(router, cfg, authUserSvc, authGroupSvc)
 	handler.RegisterAlertRoutes(router, cfg, certRepo, certDeployRepo)
-	handler.RegisterErrorPageRoutes(router, cfg, errorPageRepo, settingsSvc)
-	handler.RegisterWAFRoutes(router, cfg, wafRuleRepo, settingsSvc)
+	handler.RegisterErrorPageRoutes(router, cfg, errorPageRepo, settingsSvc, snSvc)
+	handler.RegisterWAFRoutes(router, cfg, wafRuleRepo, settingsSvc, snSvc)
+	handler.RegisterWAFBlacklistRoutes(router, cfg, wafBlacklistRepo, settingsSvc)
+	handler.RegisterWAFWhitelistRoutes(router, cfg, wafWhitelistRepo, settingsSvc)
+	handler.RegisterWAFRateLimitRoutes(router, cfg, wafRateLimitRepo, settingsSvc)
+	handler.RegisterWAFCORSRoutes(router, cfg, wafCORSRepo, settingsSvc)
 	handler.RegisterLicRoutes(router, cfg, snSvc)
 
 	// ─── 8. Jalankan scheduler CMC ─────────────────────────────────
@@ -167,6 +180,7 @@ func main() {
 	mainMux.Handle("/", web.Handler())
 
 	var h http.Handler = mainMux
+	h = wafEngine.Middleware(h)
 	h = middleware.NewLoggingMiddleware(cfg, h)
 	h = middleware.NewAPIRateLimitMiddleware(cfg, h)
 	h = middleware.NewRecoveryMiddleware(h)
