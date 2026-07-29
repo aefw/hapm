@@ -1,12 +1,12 @@
 {
-  "name": "HAProxy Manager",
-  "short_name": "HAPM",
-  "description": "Centralized HAProxy Management Platform",
+  "name": "Hapm",
+  "short_name": "Hapm",
+  "description": "Hapm",
   "lang": "en-US",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1a1f2e",
-  "theme_color": "#1a1f2e",
+  "background_color": "#007aff",
+  "theme_color": "#007aff",
   "icons": [
     {
       "src": "/icons/128x128.png",

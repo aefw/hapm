@@ -53,7 +53,9 @@ help: ## Tampilkan semua perintah yang tersedia
 # ─── Frontend ────────────────────────────────────────────────────────────────
 build-frontend: ## Build frontend (config-publish) dan sync ke web/dist/
 	@echo "$(GREEN)Building frontend...$(NC)"
-	@cd $(FRONTEND_DIR) && npm run build-docker
+	@cat $(HOME)/Dropbox/Framework7/Hapm/src/config-publish.js > $(FRONTEND_DIR)/src/config.js
+	@cp -rf $(HOME)/Dropbox/Framework7/Hapm/src/css $(FRONTEND_DIR)/src/
+	@cd $(FRONTEND_DIR) && npm run build
 	@mkdir -p $(WEB_DIST)
 	@rsync -av --delete $(FRONTEND_DIR)/www/ $(WEB_DIST)/
 	@echo "$(GREEN)✓ Frontend berhasil di-sync ke $(WEB_DIST)$(NC)"
