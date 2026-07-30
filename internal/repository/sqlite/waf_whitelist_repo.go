@@ -15,6 +15,8 @@ func NewWAFWhitelistRepository(db *sql.DB) domain.WAFWhitelistRepository {
 	return &wafWhitelistRepo{db: db}
 }
 
+const wafWhitelistType = "whitelist"
+
 func (r *wafWhitelistRepo) List(ctx context.Context) ([]*domain.WAFWhitelist, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, ip_address, description, expires_at, created, timestamp
@@ -33,7 +35,18 @@ func (r *wafWhitelistRepo) List(ctx context.Context) ([]*domain.WAFWhitelist, er
 		}
 		list = append(list, wl)
 	}
-	return list, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	bindings, err := loadDomainBindingsBatch(ctx, r.db, wafWhitelistType)
+	if err != nil {
+		return nil, err
+	}
+	for _, wl := range list {
+		wl.DomainIDs = ensureIntSlice(bindings[wl.ID])
+	}
+	return list, nil
 }
 
 func (r *wafWhitelistRepo) FindByID(ctx context.Context, id int) (*domain.WAFWhitelist, error) {
@@ -45,6 +58,11 @@ func (r *wafWhitelistRepo) FindByID(ctx context.Context, id int) (*domain.WAFWhi
 	if err != nil {
 		return nil, err
 	}
+	ids, err := loadDomainBindings(ctx, r.db, wafWhitelistType, wl.ID)
+	if err != nil {
+		return nil, err
+	}
+	wl.DomainIDs = ensureIntSlice(ids)
 	return wl, nil
 }
 
@@ -86,10 +104,13 @@ func (r *wafWhitelistRepo) Create(ctx context.Context, wl *domain.WAFWhitelist) 
 	}
 	id, _ := res.LastInsertId()
 	wl.ID = int(id)
-	return nil
+	return saveDomainBindings(ctx, r.db, wafWhitelistType, wl.ID, wl.DomainIDs)
 }
 
 func (r *wafWhitelistRepo) Delete(ctx context.Context, id int) error {
+	if err := deleteDomainBindings(ctx, r.db, wafWhitelistType, id); err != nil {
+		return err
+	}
 	_, err := r.db.ExecContext(ctx, `DELETE FROM waf_whitelist WHERE id = ?`, id)
 	return err
 }

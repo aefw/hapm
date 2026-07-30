@@ -62,6 +62,7 @@ type corsRuleRequest struct {
 	MaxAgeSeconds    int    `json:"max_age_seconds"`
 	Enabled          bool   `json:"enabled"`
 	Priority         int    `json:"priority"`
+	DomainIDs        []int  `json:"domain_ids"`
 }
 
 func (req *corsRuleRequest) validate() string {
@@ -132,6 +133,7 @@ func (h *WAFCORSHandler) Create(w http.ResponseWriter, r *http.Request, _ []stri
 		MaxAgeSeconds:    maxAge,
 		Enabled:          req.Enabled,
 		Priority:         req.Priority,
+		DomainIDs:        req.DomainIDs,
 	}
 	if err := h.repo.Create(ctx, rule); err != nil {
 		core.Error(w, http.StatusInternalServerError, "Gagal menyimpan CORS rule: "+err.Error())
@@ -185,6 +187,7 @@ func (h *WAFCORSHandler) Update(w http.ResponseWriter, r *http.Request, params [
 	}
 	rule.Enabled = req.Enabled
 	rule.Priority = req.Priority
+	rule.DomainIDs = req.DomainIDs
 
 	if err := h.repo.Update(ctx, rule); err != nil {
 		core.Error(w, http.StatusInternalServerError, "Gagal memperbarui CORS rule: "+err.Error())

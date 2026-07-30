@@ -59,6 +59,7 @@ type rateLimitRequest struct {
 	BlockDurationSeconds   int    `json:"block_duration_seconds"`
 	AutoBlacklistThreshold *int   `json:"auto_blacklist_threshold"`
 	Enabled                bool   `json:"enabled"`
+	DomainIDs              []int  `json:"domain_ids"`
 }
 
 func (req *rateLimitRequest) validate() string {
@@ -111,6 +112,7 @@ func (h *WAFRateLimitHandler) Create(w http.ResponseWriter, r *http.Request, _ [
 		BlockDurationSeconds:   req.BlockDurationSeconds,
 		AutoBlacklistThreshold: req.AutoBlacklistThreshold,
 		Enabled:                req.Enabled,
+		DomainIDs:              req.DomainIDs,
 	}
 	if err := h.repo.Create(ctx, rl); err != nil {
 		core.Error(w, http.StatusInternalServerError, "Gagal menyimpan rate limit profile: "+err.Error())
@@ -158,6 +160,7 @@ func (h *WAFRateLimitHandler) Update(w http.ResponseWriter, r *http.Request, par
 	rl.BlockDurationSeconds = req.BlockDurationSeconds
 	rl.AutoBlacklistThreshold = req.AutoBlacklistThreshold
 	rl.Enabled = req.Enabled
+	rl.DomainIDs = req.DomainIDs
 
 	if err := h.repo.Update(ctx, rl); err != nil {
 		core.Error(w, http.StatusInternalServerError, "Gagal memperbarui rate limit profile: "+err.Error())

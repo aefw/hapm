@@ -13,6 +13,8 @@ func NewWAFRuleRepository(db *sql.DB) domain.WAFRuleRepository {
 	return &wafRuleRepo{db: db}
 }
 
+const wafRuleType = "rule"
+
 func (r *wafRuleRepo) List(ctx context.Context) ([]*domain.WAFRule, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id_waf_rules, name, rule_type, value, action, enabled, created, timestamp
@@ -33,7 +35,18 @@ func (r *wafRuleRepo) List(ctx context.Context) ([]*domain.WAFRule, error) {
 		rule.Enabled = enabled == 1
 		list = append(list, rule)
 	}
-	return list, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	bindings, err := loadDomainBindingsBatch(ctx, r.db, wafRuleType)
+	if err != nil {
+		return nil, err
+	}
+	for _, rule := range list {
+		rule.DomainIDs = ensureIntSlice(bindings[rule.ID])
+	}
+	return list, nil
 }
 
 func (r *wafRuleRepo) FindByID(ctx context.Context, id int) (*domain.WAFRule, error) {
@@ -48,6 +61,11 @@ func (r *wafRuleRepo) FindByID(ctx context.Context, id int) (*domain.WAFRule, er
 		return nil, err
 	}
 	rule.Enabled = enabled == 1
+	ids, err := loadDomainBindings(ctx, r.db, wafRuleType, rule.ID)
+	if err != nil {
+		return nil, err
+	}
+	rule.DomainIDs = ensureIntSlice(ids)
 	return rule, nil
 }
 
@@ -67,7 +85,7 @@ func (r *wafRuleRepo) Create(ctx context.Context, rule *domain.WAFRule) error {
 		return err
 	}
 	rule.ID = int(id)
-	return nil
+	return saveDomainBindings(ctx, r.db, wafRuleType, rule.ID, rule.DomainIDs)
 }
 
 func (r *wafRuleRepo) Update(ctx context.Context, rule *domain.WAFRule) error {
@@ -79,10 +97,16 @@ func (r *wafRuleRepo) Update(ctx context.Context, rule *domain.WAFRule) error {
 		`UPDATE waf_rules SET name = ?, rule_type = ?, value = ?, action = ?, enabled = ?,
 		 timestamp = CURRENT_TIMESTAMP WHERE id_waf_rules = ?`,
 		rule.Name, rule.RuleType, rule.Value, rule.Action, enabled, rule.ID)
-	return err
+	if err != nil {
+		return err
+	}
+	return saveDomainBindings(ctx, r.db, wafRuleType, rule.ID, rule.DomainIDs)
 }
 
 func (r *wafRuleRepo) Delete(ctx context.Context, id int) error {
+	if err := deleteDomainBindings(ctx, r.db, wafRuleType, id); err != nil {
+		return err
+	}
 	_, err := r.db.ExecContext(ctx, `DELETE FROM waf_rules WHERE id_waf_rules = ?`, id)
 	return err
 }

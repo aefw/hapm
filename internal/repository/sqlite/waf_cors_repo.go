@@ -7,6 +7,8 @@ import (
 	"github.com/aefw/hapm/internal/domain"
 )
 
+const wafCORSType = "cors"
+
 type wafCORSRepo struct{ db *sql.DB }
 
 func NewWAFCORSRepository(db *sql.DB) domain.WAFCORSRepository {
@@ -23,7 +25,18 @@ func (r *wafCORSRepo) List(ctx context.Context) ([]*domain.WAFCORSRule, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	return r.scanRows(rows)
+	list, err := r.scanRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	bindings, err := loadDomainBindingsBatch(ctx, r.db, wafCORSType)
+	if err != nil {
+		return nil, err
+	}
+	for _, rule := range list {
+		rule.DomainIDs = ensureIntSlice(bindings[rule.ID])
+	}
+	return list, nil
 }
 
 func (r *wafCORSRepo) ListEnabled(ctx context.Context) ([]*domain.WAFCORSRule, error) {
@@ -36,7 +49,18 @@ func (r *wafCORSRepo) ListEnabled(ctx context.Context) ([]*domain.WAFCORSRule, e
 		return nil, err
 	}
 	defer rows.Close()
-	return r.scanRows(rows)
+	list, err := r.scanRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	bindings, err := loadDomainBindingsBatch(ctx, r.db, wafCORSType)
+	if err != nil {
+		return nil, err
+	}
+	for _, rule := range list {
+		rule.DomainIDs = ensureIntSlice(bindings[rule.ID])
+	}
+	return list, nil
 }
 
 func (r *wafCORSRepo) FindByID(ctx context.Context, id int) (*domain.WAFCORSRule, error) {
@@ -56,6 +80,11 @@ func (r *wafCORSRepo) FindByID(ctx context.Context, id int) (*domain.WAFCORSRule
 	}
 	rule.AllowCredentials = creds == 1
 	rule.Enabled = enabled == 1
+	ids, err := loadDomainBindings(ctx, r.db, wafCORSType, rule.ID)
+	if err != nil {
+		return nil, err
+	}
+	rule.DomainIDs = ensureIntSlice(ids)
 	return rule, nil
 }
 
@@ -80,7 +109,7 @@ func (r *wafCORSRepo) Create(ctx context.Context, rule *domain.WAFCORSRule) erro
 	}
 	id, _ := res.LastInsertId()
 	rule.ID = int(id)
-	return nil
+	return saveDomainBindings(ctx, r.db, wafCORSType, rule.ID, rule.DomainIDs)
 }
 
 func (r *wafCORSRepo) Update(ctx context.Context, rule *domain.WAFCORSRule) error {
@@ -99,10 +128,16 @@ func (r *wafCORSRepo) Update(ctx context.Context, rule *domain.WAFCORSRule) erro
 		rule.Name, rule.PathPattern, rule.AllowedOrigins, rule.AllowedMethods,
 		rule.AllowedHeaders, rule.ExposeHeaders, creds, rule.MaxAgeSeconds,
 		enabled, rule.Priority, rule.ID)
-	return err
+	if err != nil {
+		return err
+	}
+	return saveDomainBindings(ctx, r.db, wafCORSType, rule.ID, rule.DomainIDs)
 }
 
 func (r *wafCORSRepo) Delete(ctx context.Context, id int) error {
+	if err := deleteDomainBindings(ctx, r.db, wafCORSType, id); err != nil {
+		return err
+	}
 	_, err := r.db.ExecContext(ctx, `DELETE FROM waf_cors_rules WHERE id = ?`, id)
 	return err
 }

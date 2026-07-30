@@ -18,6 +18,7 @@ type WAFCORSRule struct {
 	MaxAgeSeconds    int       `json:"max_age_seconds"`
 	Enabled          bool      `json:"enabled"`
 	Priority         int       `json:"priority"`
+	DomainIDs        []int     `json:"domain_ids"` // kosong = berlaku global semua domain
 	Created          time.Time `json:"created"`
 	Timestamp        time.Time `json:"timestamp"`
 }

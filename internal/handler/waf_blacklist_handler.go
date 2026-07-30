@@ -55,6 +55,7 @@ type blacklistCreateRequest struct {
 	IPAddress string  `json:"ip_address"`
 	Reason    string  `json:"reason"`
 	ExpiresAt *string `json:"expires_at"`
+	DomainIDs []int   `json:"domain_ids"`
 }
 
 // POST /api/v1/waf/blacklist
@@ -86,6 +87,7 @@ func (h *WAFBlacklistHandler) Create(w http.ResponseWriter, r *http.Request, _ [
 	bl := &domain.WAFBlacklist{
 		IPAddress: req.IPAddress,
 		Reason:    strings.TrimSpace(req.Reason),
+		DomainIDs: req.DomainIDs,
 	}
 	if req.ExpiresAt != nil && *req.ExpiresAt != "" {
 		t, err := time.Parse(time.RFC3339, *req.ExpiresAt)

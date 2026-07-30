@@ -7,6 +7,8 @@ import (
 	"github.com/aefw/hapm/internal/domain"
 )
 
+const wafRateLimitType = "rate_limit"
+
 type wafRateLimitRepo struct{ db *sql.DB }
 
 func NewWAFRateLimitRepository(db *sql.DB) domain.WAFRateLimitRepository {
@@ -22,7 +24,18 @@ func (r *wafRateLimitRepo) List(ctx context.Context) ([]*domain.WAFRateLimit, er
 		return nil, err
 	}
 	defer rows.Close()
-	return r.scanRows(rows)
+	list, err := r.scanRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	bindings, err := loadDomainBindingsBatch(ctx, r.db, wafRateLimitType)
+	if err != nil {
+		return nil, err
+	}
+	for _, rl := range list {
+		rl.DomainIDs = ensureIntSlice(bindings[rl.ID])
+	}
+	return list, nil
 }
 
 func (r *wafRateLimitRepo) ListEnabled(ctx context.Context) ([]*domain.WAFRateLimit, error) {
@@ -34,7 +47,18 @@ func (r *wafRateLimitRepo) ListEnabled(ctx context.Context) ([]*domain.WAFRateLi
 		return nil, err
 	}
 	defer rows.Close()
-	return r.scanRows(rows)
+	list, err := r.scanRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	bindings, err := loadDomainBindingsBatch(ctx, r.db, wafRateLimitType)
+	if err != nil {
+		return nil, err
+	}
+	for _, rl := range list {
+		rl.DomainIDs = ensureIntSlice(bindings[rl.ID])
+	}
+	return list, nil
 }
 
 func (r *wafRateLimitRepo) FindByID(ctx context.Context, id int) (*domain.WAFRateLimit, error) {
@@ -51,6 +75,11 @@ func (r *wafRateLimitRepo) FindByID(ctx context.Context, id int) (*domain.WAFRat
 		return nil, err
 	}
 	rl.Enabled = enabled == 1
+	ids, err := loadDomainBindings(ctx, r.db, wafRateLimitType, rl.ID)
+	if err != nil {
+		return nil, err
+	}
+	rl.DomainIDs = ensureIntSlice(ids)
 	return rl, nil
 }
 
@@ -71,7 +100,7 @@ func (r *wafRateLimitRepo) Create(ctx context.Context, rl *domain.WAFRateLimit) 
 	}
 	id, _ := res.LastInsertId()
 	rl.ID = int(id)
-	return nil
+	return saveDomainBindings(ctx, r.db, wafRateLimitType, rl.ID, rl.DomainIDs)
 }
 
 func (r *wafRateLimitRepo) Update(ctx context.Context, rl *domain.WAFRateLimit) error {
@@ -85,10 +114,16 @@ func (r *wafRateLimitRepo) Update(ctx context.Context, rl *domain.WAFRateLimit) 
 		 enabled=?, timestamp=CURRENT_TIMESTAMP WHERE id=?`,
 		rl.Name, rl.PathPattern, rl.MaxRequests, rl.WindowSeconds,
 		rl.BlockDurationSeconds, rl.AutoBlacklistThreshold, enabled, rl.ID)
-	return err
+	if err != nil {
+		return err
+	}
+	return saveDomainBindings(ctx, r.db, wafRateLimitType, rl.ID, rl.DomainIDs)
 }
 
 func (r *wafRateLimitRepo) Delete(ctx context.Context, id int) error {
+	if err := deleteDomainBindings(ctx, r.db, wafRateLimitType, id); err != nil {
+		return err
+	}
 	_, err := r.db.ExecContext(ctx, `DELETE FROM waf_rate_limits WHERE id = ?`, id)
 	return err
 }

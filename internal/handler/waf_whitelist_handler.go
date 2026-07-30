@@ -54,6 +54,7 @@ type whitelistCreateRequest struct {
 	IPAddress   string  `json:"ip_address"`
 	Description string  `json:"description"`
 	ExpiresAt   *string `json:"expires_at"`
+	DomainIDs   []int   `json:"domain_ids"`
 }
 
 // POST /api/v1/waf/whitelist
@@ -85,6 +86,7 @@ func (h *WAFWhitelistHandler) Create(w http.ResponseWriter, r *http.Request, _ [
 	wl := &domain.WAFWhitelist{
 		IPAddress:   req.IPAddress,
 		Description: strings.TrimSpace(req.Description),
+		DomainIDs:   req.DomainIDs,
 	}
 	if req.ExpiresAt != nil && *req.ExpiresAt != "" {
 		t, err := time.Parse(time.RFC3339, *req.ExpiresAt)

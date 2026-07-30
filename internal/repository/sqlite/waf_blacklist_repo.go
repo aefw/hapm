@@ -14,6 +14,8 @@ func NewWAFBlacklistRepository(db *sql.DB) domain.WAFBlacklistRepository {
 	return &wafBlacklistRepo{db: db}
 }
 
+const wafBlacklistType = "blacklist"
+
 func (r *wafBlacklistRepo) List(ctx context.Context) ([]*domain.WAFBlacklist, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, ip_address, reason, expires_at, created, timestamp
@@ -32,7 +34,18 @@ func (r *wafBlacklistRepo) List(ctx context.Context) ([]*domain.WAFBlacklist, er
 		}
 		list = append(list, bl)
 	}
-	return list, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	bindings, err := loadDomainBindingsBatch(ctx, r.db, wafBlacklistType)
+	if err != nil {
+		return nil, err
+	}
+	for _, bl := range list {
+		bl.DomainIDs = ensureIntSlice(bindings[bl.ID])
+	}
+	return list, nil
 }
 
 func (r *wafBlacklistRepo) FindByID(ctx context.Context, id int) (*domain.WAFBlacklist, error) {
@@ -44,6 +57,11 @@ func (r *wafBlacklistRepo) FindByID(ctx context.Context, id int) (*domain.WAFBla
 	if err != nil {
 		return nil, err
 	}
+	ids, err := loadDomainBindings(ctx, r.db, wafBlacklistType, bl.ID)
+	if err != nil {
+		return nil, err
+	}
+	bl.DomainIDs = ensureIntSlice(ids)
 	return bl, nil
 }
 
@@ -84,10 +102,13 @@ func (r *wafBlacklistRepo) Create(ctx context.Context, bl *domain.WAFBlacklist) 
 	}
 	id, _ := res.LastInsertId()
 	bl.ID = int(id)
-	return nil
+	return saveDomainBindings(ctx, r.db, wafBlacklistType, bl.ID, bl.DomainIDs)
 }
 
 func (r *wafBlacklistRepo) Delete(ctx context.Context, id int) error {
+	if err := deleteDomainBindings(ctx, r.db, wafBlacklistType, id); err != nil {
+		return err
+	}
 	_, err := r.db.ExecContext(ctx, `DELETE FROM waf_blacklist WHERE id = ?`, id)
 	return err
 }

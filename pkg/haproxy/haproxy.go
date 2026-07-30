@@ -15,8 +15,9 @@ import (
 
 // Generator mendefinisikan kontrak untuk generate konfigurasi HAProxy
 type Generator interface {
-	// Generate menghasilkan (haproxy.cfg content, hosts.map content, error)
-	Generate(ctx context.Context, node *domain.Node, domains []*domain.DomainEntry, pools []*domain.BackendPool, certs []*domain.Certificate, services []*domain.Service, authGroups []*domain.AuthGroup, errorPages []*domain.ErrorPage) (string, string, error)
+	// Generate menghasilkan (haproxy.cfg content, hosts.map content, error).
+	// wafConfig nil berarti WAF dinonaktifkan — tidak ada WAF directives yang digenerate.
+	Generate(ctx context.Context, node *domain.Node, domains []*domain.DomainEntry, pools []*domain.BackendPool, certs []*domain.Certificate, services []*domain.Service, authGroups []*domain.AuthGroup, errorPages []*domain.ErrorPage, wafConfig *domain.WAFConfig) (string, string, error)
 }
 
 // Validator mendefinisikan kontrak untuk validasi konfigurasi HAProxy
@@ -55,9 +56,10 @@ func NewGenerator() Generator {
 	return &generator{}
 }
 
-// Generate menghasilkan konfigurasi HAProxy 3.x dari domain entries, backend pools, SSL certs, services, dan auth groups.
+// Generate menghasilkan konfigurasi HAProxy 3.x dari domain entries, backend pools, SSL certs, services, auth groups, dan WAF config.
 // Mengembalikan (haproxy.cfg content, hosts.map content, error).
 // hosts.map di-deploy ke /etc/haproxy/map/hosts di node untuk routing domain via map file.
+// wafConfig nil berarti WAF tidak aktif.
 func (g *generator) Generate(
 	ctx context.Context,
 	node *domain.Node,
@@ -67,6 +69,7 @@ func (g *generator) Generate(
 	services []*domain.Service,
 	authGroups []*domain.AuthGroup,
 	errorPages []*domain.ErrorPage,
+	wafConfig *domain.WAFConfig,
 ) (string, string, error) {
 	var sb strings.Builder
 	var hm strings.Builder // content untuk /etc/haproxy/map/hosts
@@ -153,6 +156,11 @@ func (g *generator) Generate(
 		fmt.Fprintf(&hm, "%s backend_%s\n", strings.ToLower(d.DomainName), sanitizeName(d.DomainName))
 	}
 
+	// ── WAF: Rate limit stick-table backends (sebelum frontend) ──
+	if wafConfig != nil {
+		writeWAFRateLimitBackends(&sb, wafConfig)
+	}
+
 	// ── ACME challenge backend (HTTP-01) ──
 	// Selalu ada agar acme.sh HTTP-01 bisa berjalan tanpa mengganggu traffic
 	sb.WriteString("backend acme_challenge\n")
@@ -183,7 +191,12 @@ func (g *generator) Generate(
 		}
 	}
 
-	// Cloudflare real IP extraction
+	// WAF directives (IP normalization, ACLs, deny rules, rate limit, CORS)
+	if wafConfig != nil {
+		writeWAFDirectives(&sb, wafConfig)
+	}
+
+	// Cloudflare real IP extraction (header forwarding — berbeda dari txn.real_ip untuk WAF)
 	if node.BehindCloudflare {
 		sb.WriteString("    http-request set-header X-Real-IP %[req.hdr(CF-Connecting-IP)] if { req.hdr(CF-Connecting-IP) -m found }\n")
 	}
@@ -231,6 +244,11 @@ func (g *generator) Generate(
 		if node.BehindCloudflare {
 			sb.WriteString("    # Ekstrak real client IP dari header Cloudflare\n")
 			sb.WriteString("    http-request set-header X-Real-IP %[req.hdr(CF-Connecting-IP)] if { req.hdr(CF-Connecting-IP) -m found }\n")
+		}
+
+		// WAF directives pada HTTPS frontend (sama seperti HTTP)
+		if wafConfig != nil {
+			writeWAFDirectives(&sb, wafConfig)
 		}
 
 		// Basic Auth per-domain pada HTTPS frontend
@@ -796,6 +814,216 @@ func (p *provisioner) GetVersion(ctx context.Context, conn *ssh.Connection) (str
 		}
 	}
 	return strings.TrimSpace(output), nil
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WAF CONFIG GENERATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+// writeWAFRateLimitBackends menulis stick-table backends untuk rate limiting.
+// Harus dipanggil SEBELUM frontend sections (HAProxy membutuhkan backend sebelum direferensikan).
+// Maksimum 3 profil rate limit (sc0, sc1, sc2 = batas HAProxy stick counters).
+func writeWAFRateLimitBackends(sb *strings.Builder, waf *domain.WAFConfig) {
+	count := 0
+	for _, rl := range waf.RateLimits {
+		if !rl.Enabled || count >= 3 {
+			break
+		}
+		expire := rl.WindowSeconds * 2
+		if expire < 60 {
+			expire = 60
+		}
+		sb.WriteString(fmt.Sprintf("backend waf_rl_store_%d\n", rl.ID))
+		sb.WriteString("    mode http\n")
+		sb.WriteString(fmt.Sprintf("    stick-table type ip size 100k expire %ds store http_req_rate(%ds)\n\n",
+			expire, rl.WindowSeconds))
+		count++
+	}
+}
+
+// writeWAFDirectives menulis semua WAF ACL dan http-request/http-response directives
+// ke dalam frontend block. Urutan: IP normalization → whitelist ACL → blacklist ACL →
+// custom rule ACLs → CORS ACLs → preflight return → deny rules → rate limit → CORS response headers.
+func writeWAFDirectives(sb *strings.Builder, waf *domain.WAFConfig) {
+	hasAny := len(waf.Blacklist) > 0 || len(waf.Whitelist) > 0 ||
+		len(waf.Rules) > 0 || len(waf.RateLimits) > 0 || len(waf.CORSRules) > 0
+	if !hasAny {
+		return
+	}
+
+	sb.WriteString("    # ── WAF: IP Normalization (CF-Connecting-IP or RemoteAddr) ──\n")
+	sb.WriteString("    http-request set-var(txn.real_ip) req.hdr_ip(CF-Connecting-IP) if { req.hdr(CF-Connecting-IP) -m found }\n")
+	sb.WriteString("    http-request set-var(txn.real_ip) src if !{ req.hdr(CF-Connecting-IP) -m found }\n")
+
+	// Whitelist ACL (global bypass flag — selalu dulu sebelum deny rules)
+	if len(waf.Whitelist) > 0 {
+		sb.WriteString("    # ── WAF: Whitelist ──\n")
+		sb.WriteString("    acl waf_whitelist var(txn.real_ip) -m ip -f /etc/haproxy/waf/whitelist.map\n")
+	}
+
+	// Blacklist ACL
+	if len(waf.Blacklist) > 0 {
+		sb.WriteString("    # ── WAF: Blacklist ──\n")
+		sb.WriteString("    acl waf_blacklist var(txn.real_ip) -m ip -f /etc/haproxy/waf/blacklist.map\n")
+	}
+
+	// Custom WAF Rule ACLs
+	for _, rule := range waf.Rules {
+		if !rule.Enabled {
+			continue
+		}
+		aclName := fmt.Sprintf("waf_rule_%d", rule.ID)
+		switch rule.RuleType {
+		case "ip_block":
+			sb.WriteString(fmt.Sprintf("    acl %s var(txn.real_ip) -m ip %s\n", aclName, rule.Value))
+		case "path_block":
+			sb.WriteString(fmt.Sprintf("    acl %s path_reg -i %s\n", aclName, rule.Value))
+		case "ua_block":
+			sb.WriteString(fmt.Sprintf("    acl %s req.hdr(User-Agent) -i -m sub %s\n", aclName, rule.Value))
+		case "header_block":
+			// Format value: "Header-Name: keyword"
+			parts := strings.SplitN(rule.Value, ":", 2)
+			if len(parts) == 2 {
+				sb.WriteString(fmt.Sprintf("    acl %s req.hdr(%s) -i -m sub %s\n",
+					aclName, strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])))
+			}
+		}
+		// Domain-scoped ACL untuk rule ini
+		if len(rule.DomainIDs) > 0 {
+			aclDomain := fmt.Sprintf("waf_rule_%d_domain", rule.ID)
+			for _, did := range rule.DomainIDs {
+				if name, ok := waf.DomainNames[did]; ok {
+					sb.WriteString(fmt.Sprintf("    acl %s hdr(host) -i %s\n", aclDomain, name))
+				}
+			}
+		}
+	}
+
+	// CORS: domain ACL + path ACL (untuk preflight dan response header)
+	for _, cr := range waf.CORSRules {
+		if !cr.Enabled {
+			continue
+		}
+		aclPath := fmt.Sprintf("waf_cors_path_%d", cr.ID)
+		sb.WriteString(fmt.Sprintf("    acl %s path_reg -i %s\n", aclPath, cr.PathPattern))
+		if len(cr.DomainIDs) > 0 {
+			aclDomain := fmt.Sprintf("waf_cors_domain_%d", cr.ID)
+			for _, did := range cr.DomainIDs {
+				if name, ok := waf.DomainNames[did]; ok {
+					sb.WriteString(fmt.Sprintf("    acl %s hdr(host) -i %s\n", aclDomain, name))
+				}
+			}
+		}
+	}
+
+	// Preflight OPTIONS return (CORS — harus sebelum deny rules)
+	for _, cr := range waf.CORSRules {
+		if !cr.Enabled {
+			continue
+		}
+		cond := buildCORSCondition(cr)
+		sb.WriteString(fmt.Sprintf(
+			"    http-request return status 204 if %s { req.method -i OPTIONS }\n", cond))
+	}
+
+	// Deny: blacklist
+	if len(waf.Blacklist) > 0 {
+		whitelistClause := ""
+		if len(waf.Whitelist) > 0 {
+			whitelistClause = " !waf_whitelist"
+		}
+		sb.WriteString(fmt.Sprintf("    http-request deny deny_status 403 if waf_blacklist%s\n", whitelistClause))
+	}
+
+	// Deny: custom rules
+	for _, rule := range waf.Rules {
+		if !rule.Enabled {
+			continue
+		}
+		aclName := fmt.Sprintf("waf_rule_%d", rule.ID)
+		whitelistClause := ""
+		if len(waf.Whitelist) > 0 {
+			whitelistClause = " !waf_whitelist"
+		}
+		if len(rule.DomainIDs) > 0 {
+			aclDomain := fmt.Sprintf("waf_rule_%d_domain", rule.ID)
+			sb.WriteString(fmt.Sprintf("    http-request deny deny_status 403 if %s %s%s\n",
+				aclName, aclDomain, whitelistClause))
+		} else {
+			sb.WriteString(fmt.Sprintf("    http-request deny deny_status 403 if %s%s\n",
+				aclName, whitelistClause))
+		}
+	}
+
+	// Rate Limit — maksimum 3 profil (sc0/sc1/sc2)
+	scIdx := 0
+	for _, rl := range waf.RateLimits {
+		if !rl.Enabled || scIdx >= 3 {
+			break
+		}
+		table := fmt.Sprintf("waf_rl_store_%d", rl.ID)
+		whitelistClause := ""
+		if len(waf.Whitelist) > 0 {
+			whitelistClause = " !waf_whitelist"
+		}
+		pathCond := ""
+		if rl.PathPattern != "" && rl.PathPattern != ".*" {
+			pathCond = fmt.Sprintf(" { path_reg -i %s }", rl.PathPattern)
+		}
+		domainCond := ""
+		if len(rl.DomainIDs) > 0 {
+			for _, did := range rl.DomainIDs {
+				if name, ok := waf.DomainNames[did]; ok {
+					domainCond += fmt.Sprintf(" { hdr(host) -i %s }", name)
+				}
+			}
+		}
+		sb.WriteString(fmt.Sprintf("    http-request track-sc%d var(txn.real_ip) table %s%s%s\n",
+			scIdx, table, pathCond, domainCond))
+		sb.WriteString(fmt.Sprintf(
+			"    http-request deny deny_status 429 if { sc_http_req_rate(%d,%s) gt %d }%s%s%s\n",
+			scIdx, table, rl.MaxRequests, pathCond, domainCond, whitelistClause))
+		scIdx++
+	}
+
+	// CORS response headers
+	for _, cr := range waf.CORSRules {
+		if !cr.Enabled {
+			continue
+		}
+		cond := buildCORSCondition(cr)
+		sb.WriteString(fmt.Sprintf(
+			"    http-response set-header Access-Control-Allow-Origin %%[req.hdr(Origin)] if %s\n", cond))
+		if cr.AllowedMethods != "" {
+			sb.WriteString(fmt.Sprintf(
+				"    http-response set-header Access-Control-Allow-Methods \"%s\" if %s\n",
+				cr.AllowedMethods, cond))
+		}
+		if cr.AllowedHeaders != "" {
+			sb.WriteString(fmt.Sprintf(
+				"    http-response set-header Access-Control-Allow-Headers \"%s\" if %s\n",
+				cr.AllowedHeaders, cond))
+		}
+		if cr.ExposeHeaders != "" {
+			sb.WriteString(fmt.Sprintf(
+				"    http-response set-header Access-Control-Expose-Headers \"%s\" if %s\n",
+				cr.ExposeHeaders, cond))
+		}
+		if cr.AllowCredentials {
+			sb.WriteString(fmt.Sprintf(
+				"    http-response set-header Access-Control-Allow-Credentials \"true\" if %s\n", cond))
+		}
+		sb.WriteString(fmt.Sprintf("    http-response set-header Vary \"Origin\" if %s\n", cond))
+	}
+}
+
+// buildCORSCondition membangun kondisi ACL untuk CORS rule (domain + path).
+func buildCORSCondition(cr *domain.WAFCORSRule) string {
+	parts := []string{fmt.Sprintf("waf_cors_path_%d", cr.ID)}
+	if len(cr.DomainIDs) > 0 {
+		parts = append([]string{fmt.Sprintf("waf_cors_domain_%d", cr.ID)}, parts...)
+	}
+	return strings.Join(parts, " ")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

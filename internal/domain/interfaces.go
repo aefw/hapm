@@ -498,11 +498,18 @@ type SettingsService interface {
 
 // GeneratedConfig adalah hasil generate konfigurasi HAProxy
 type GeneratedConfig struct {
-	NodeID     int            `json:"id_nodes"`
-	Content    string         `json:"content"`
-	HostsMap   string         `json:"hosts_map"`   // content untuk /etc/haproxy/map/hosts
-	Hash       string         `json:"hash"`        // SHA256 dari content
-	ErrorPages map[int]string `json:"-"`           // code → wrapped HTTP content untuk deploy ke node
+	NodeID          int            `json:"id_nodes"`
+	Content         string         `json:"content"`
+	HostsMap        string         `json:"hosts_map"`        // content untuk /etc/haproxy/map/hosts
+	WAFBlacklistMap string         `json:"waf_blacklist_map"` // content untuk /etc/haproxy/waf/blacklist.map
+	WAFWhitelistMap string         `json:"waf_whitelist_map"` // content untuk /etc/haproxy/waf/whitelist.map
+	Hash            string         `json:"hash"`             // SHA256 dari content
+	ErrorPages      map[int]string `json:"-"`                // code → wrapped HTTP content untuk deploy ke node
+}
+
+// WAFGenerationRepository mengagregasi semua WAF data yang diperlukan untuk config generation.
+type WAFGenerationRepository interface {
+	LoadForGeneration(ctx context.Context) (*WAFConfig, error)
 }
 
 // ConfigService mendefinisikan kontrak layanan generate konfigurasi

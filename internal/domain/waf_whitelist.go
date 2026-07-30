@@ -11,6 +11,7 @@ type WAFWhitelist struct {
 	IPAddress   string     `json:"ip_address"`
 	Description string     `json:"description"`
 	ExpiresAt   *time.Time `json:"expires_at"`
+	DomainIDs   []int      `json:"domain_ids"` // kosong = berlaku global semua domain
 	Created     time.Time  `json:"created"`
 	Timestamp   time.Time  `json:"timestamp"`
 }

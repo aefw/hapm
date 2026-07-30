@@ -175,10 +175,10 @@ func (s *deployService) runPipeline(ctx context.Context, deployment *domain.Depl
 	// Upload ke /tmp terlebih dahulu (user-writable), lalu sudo mv ke /etc/haproxy/
 	updateStatus(domain.DeployStatusRunning, domain.DeployStageUpload, "")
 
-	// Pastikan direktori map ada di node
-	if _, err := s.sshClient.RunCommand(ctx, conn, "sudo mkdir -p /etc/haproxy/map"); err != nil {
+	// Pastikan direktori map dan waf ada di node
+	if _, err := s.sshClient.RunCommand(ctx, conn, "sudo mkdir -p /etc/haproxy/map && sudo mkdir -p /etc/haproxy/waf"); err != nil {
 		updateStatus(domain.DeployStatusFailed, domain.DeployStageUpload,
-			fmt.Sprintf("gagal membuat direktori /etc/haproxy/map: %v", err))
+			fmt.Sprintf("gagal membuat direktori /etc/haproxy/map atau /etc/haproxy/waf: %v", err))
 		s.logAuditFail(ctx, deployID, userID, nodeID, "upload-mkdir-map", err)
 		return
 	}
@@ -199,6 +199,24 @@ func (s *deployService) runPipeline(ctx context.Context, deployment *domain.Depl
 			fmt.Sprintf("gagal upload hosts.map ke node: %v", err))
 		s.logAuditFail(ctx, deployID, userID, nodeID, "upload-map", err)
 		return
+	}
+
+	// Upload WAF map files jika ada
+	if generated.WAFBlacklistMap != "" {
+		if err := s.sshClient.UploadFile(ctx, conn, []byte(generated.WAFBlacklistMap), "/tmp/hapm_waf_blacklist.map"); err != nil {
+			updateStatus(domain.DeployStatusFailed, domain.DeployStageUpload,
+				fmt.Sprintf("gagal upload WAF blacklist.map ke node: %v", err))
+			s.logAuditFail(ctx, deployID, userID, nodeID, "upload-waf-blacklist", err)
+			return
+		}
+	}
+	if generated.WAFWhitelistMap != "" {
+		if err := s.sshClient.UploadFile(ctx, conn, []byte(generated.WAFWhitelistMap), "/tmp/hapm_waf_whitelist.map"); err != nil {
+			updateStatus(domain.DeployStatusFailed, domain.DeployStageUpload,
+				fmt.Sprintf("gagal upload WAF whitelist.map ke node: %v", err))
+			s.logAuditFail(ctx, deployID, userID, nodeID, "upload-waf-whitelist", err)
+			return
+		}
 	}
 
 	// Upload custom error pages jika ada
@@ -231,6 +249,12 @@ func (s *deployService) runPipeline(ctx context.Context, deployment *domain.Depl
 			"sudo mv %s /etc/haproxy/map/hosts && sudo chmod 640 /etc/haproxy/map/hosts",
 		tmpPath, tmpMapPath,
 	)
+	if generated.WAFBlacklistMap != "" {
+		mvCmd += " && sudo mv /tmp/hapm_waf_blacklist.map /etc/haproxy/waf/blacklist.map && sudo chmod 640 /etc/haproxy/waf/blacklist.map"
+	}
+	if generated.WAFWhitelistMap != "" {
+		mvCmd += " && sudo mv /tmp/hapm_waf_whitelist.map /etc/haproxy/waf/whitelist.map && sudo chmod 640 /etc/haproxy/waf/whitelist.map"
+	}
 	if out, err := s.sshClient.RunCommand(ctx, conn, mvCmd); err != nil {
 		updateStatus(domain.DeployStatusFailed, domain.DeployStageUpload,
 			fmt.Sprintf("gagal memindahkan config ke /etc/haproxy/ (pastikan user SSH punya sudo NOPASSWD): %v — %s", err, out))

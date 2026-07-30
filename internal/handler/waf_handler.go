@@ -58,11 +58,12 @@ func (h *WAFHandler) List(w http.ResponseWriter, r *http.Request, _ []string) {
 }
 
 type wafRuleRequest struct {
-	Name     string `json:"name"`
-	RuleType string `json:"rule_type"`
-	Value    string `json:"value"`
-	Action   string `json:"action"`
-	Enabled  bool   `json:"enabled"`
+	Name      string `json:"name"`
+	RuleType  string `json:"rule_type"`
+	Value     string `json:"value"`
+	Action    string `json:"action"`
+	Enabled   bool   `json:"enabled"`
+	DomainIDs []int  `json:"domain_ids"`
 }
 
 func (req *wafRuleRequest) validate() string {
@@ -104,11 +105,12 @@ func (h *WAFHandler) Create(w http.ResponseWriter, r *http.Request, _ []string) 
 	}
 
 	rule := &domain.WAFRule{
-		Name:     strings.TrimSpace(req.Name),
-		RuleType: req.RuleType,
-		Value:    strings.TrimSpace(req.Value),
-		Action:   req.Action,
-		Enabled:  req.Enabled,
+		Name:      strings.TrimSpace(req.Name),
+		RuleType:  req.RuleType,
+		Value:     strings.TrimSpace(req.Value),
+		Action:    req.Action,
+		Enabled:   req.Enabled,
+		DomainIDs: req.DomainIDs,
 	}
 	if err := h.repo.Create(ctx, rule); err != nil {
 		core.Error(w, http.StatusInternalServerError, "Gagal menyimpan WAF rule: "+err.Error())
@@ -155,6 +157,7 @@ func (h *WAFHandler) Update(w http.ResponseWriter, r *http.Request, params []str
 	rule.Value = strings.TrimSpace(req.Value)
 	rule.Action = req.Action
 	rule.Enabled = req.Enabled
+	rule.DomainIDs = req.DomainIDs
 
 	if err := h.repo.Update(ctx, rule); err != nil {
 		core.Error(w, http.StatusInternalServerError, "Gagal memperbarui WAF rule: "+err.Error())

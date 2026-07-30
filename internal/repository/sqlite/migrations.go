@@ -684,6 +684,20 @@ CREATE TABLE IF NOT EXISTS waf_cors_rules (
 		name:    "add_expires_at_to_waf_whitelist",
 		sql:     `ALTER TABLE waf_whitelist ADD COLUMN expires_at DATETIME NULL`,
 	},
+	{
+		version: 43,
+		name:    "create_waf_domain_bindings",
+		sql: `
+CREATE TABLE IF NOT EXISTS waf_domain_bindings (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    rule_type TEXT    NOT NULL,
+    rule_id   INTEGER NOT NULL,
+    domain_id INTEGER NOT NULL,
+    UNIQUE (rule_type, rule_id, domain_id)
+);
+CREATE INDEX IF NOT EXISTS idx_waf_domain_bindings
+    ON waf_domain_bindings (rule_type, rule_id)`,
+	},
 }
 
 // RunMigrations menjalankan semua migrasi yang belum diaplikasikan.

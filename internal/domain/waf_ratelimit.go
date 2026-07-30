@@ -15,6 +15,7 @@ type WAFRateLimit struct {
 	BlockDurationSeconds   int       `json:"block_duration_seconds"`
 	AutoBlacklistThreshold *int      `json:"auto_blacklist_threshold"`
 	Enabled                bool      `json:"enabled"`
+	DomainIDs              []int     `json:"domain_ids"` // kosong = berlaku global semua domain
 	Created                time.Time `json:"created"`
 	Timestamp              time.Time `json:"timestamp"`
 }

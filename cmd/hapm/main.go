@@ -77,6 +77,7 @@ func main() {
 	wafWhitelistRepo := sqlite.NewWAFWhitelistRepository(db.SQL())
 	wafRateLimitRepo := sqlite.NewWAFRateLimitRepository(db.SQL())
 	wafCORSRepo      := sqlite.NewWAFCORSRepository(db.SQL())
+	wafGenRepo       := sqlite.NewWAFGenerationRepository(db.SQL())
 
 	// ─── 4. Inisialisasi package eksternal ────────────────────────
 	sshClient := pkgssh.NewClient()
@@ -101,7 +102,7 @@ func main() {
 	certJobSvc := service.NewCertJobService(certJobRepo)
 	distSvc := service.NewDistributionService(cfg, certRepo, certDeployRepo, nodeRepo, certStore, sshClient, auditSvc)
 	schedulerSvc := service.NewSchedulerService(certRepo, certJobRepo, certSvc, distSvc)
-	configSvc := service.NewConfigService(nodeRepo, backendRepo, domainRepo, certRepo, serviceRepo, authGroupRepo, errorPageRepo, settingRepo, haproxyGen)
+	configSvc := service.NewConfigService(nodeRepo, backendRepo, domainRepo, certRepo, serviceRepo, authGroupRepo, errorPageRepo, settingRepo, wafGenRepo, haproxyGen)
 	serviceSvc := service.NewServiceService(serviceRepo, backendRepo, auditSvc)
 	revisionSvc := service.NewRevisionService(revisionRepo, auditSvc)
 	deploySvc := service.NewDeployService(cfg, nodeRepo, domainRepo, certRepo, certStore, configSvc, revisionRepo, deployRepo, sshClient, haproxyVal, auditSvc)
