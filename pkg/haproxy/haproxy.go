@@ -851,9 +851,10 @@ func writeWAFDirectives(sb *strings.Builder, waf *domain.WAFConfig) {
 		return
 	}
 
-	sb.WriteString("    # ── WAF: IP Normalization (CF-Connecting-IP or RemoteAddr) ──\n")
+	sb.WriteString("    # ── WAF: IP Normalization (CF-Connecting-IP → X-Forwarded-For → src) ──\n")
 	sb.WriteString("    http-request set-var(txn.real_ip) req.hdr_ip(CF-Connecting-IP) if { req.hdr(CF-Connecting-IP) -m found }\n")
-	sb.WriteString("    http-request set-var(txn.real_ip) src if !{ req.hdr(CF-Connecting-IP) -m found }\n")
+	sb.WriteString("    http-request set-var(txn.real_ip) req.hdr_ip(X-Forwarded-For,1) if !{ req.hdr(CF-Connecting-IP) -m found } { req.hdr(X-Forwarded-For) -m found }\n")
+	sb.WriteString("    http-request set-var(txn.real_ip) src if !{ req.hdr(CF-Connecting-IP) -m found } !{ req.hdr(X-Forwarded-For) -m found }\n")
 
 	// Whitelist ACL (global bypass flag — selalu dulu sebelum deny rules)
 	if len(waf.Whitelist) > 0 {
