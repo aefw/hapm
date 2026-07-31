@@ -139,11 +139,16 @@ func (s *deployService) runPipeline(ctx context.Context, deployment *domain.Depl
 		PrivateKey: privateKey,
 	}
 
-	// Pastikan direktori map dan certs ada di node sebelum validasi
+	// Pastikan direktori map, waf, dan certs ada di node sebelum validasi
 	_, _ = s.sshClient.RunCommand(ctx, conn,
 		"sudo mkdir -p /etc/haproxy/map && { [ -f /etc/haproxy/map/hosts ] || sudo touch /etc/haproxy/map/hosts; }")
 	_, _ = s.sshClient.RunCommand(ctx, conn,
 		"sudo mkdir -p /etc/haproxy/certs && sudo chmod 700 /etc/haproxy/certs")
+	// WAF map files harus ada sebelum haproxy -c agar ACL -f tidak error saat validasi
+	_, _ = s.sshClient.RunCommand(ctx, conn,
+		"sudo mkdir -p /etc/haproxy/waf && "+
+			"{ [ -f /etc/haproxy/waf/blacklist.map ] || sudo touch /etc/haproxy/waf/blacklist.map; } && "+
+			"{ [ -f /etc/haproxy/waf/whitelist.map ] || sudo touch /etc/haproxy/waf/whitelist.map; }")
 
 	// Push semua cert aktif yang dipakai domain ke node (agar haproxy -c dan reload tidak gagal)
 	s.pushCertsToNode(ctx, conn)
