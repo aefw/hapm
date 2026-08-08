@@ -149,6 +149,14 @@ func (s *deployService) runPipeline(ctx context.Context, deployment *domain.Depl
 		"sudo mkdir -p /etc/haproxy/waf && "+
 			"{ [ -f /etc/haproxy/waf/blacklist.map ] || sudo touch /etc/haproxy/waf/blacklist.map; } && "+
 			"{ [ -f /etc/haproxy/waf/whitelist.map ] || sudo touch /etc/haproxy/waf/whitelist.map; }")
+	// Error page files harus ada sebelum haproxy -c agar errorfile directive tidak error saat validasi
+	var errFileCmds []string
+	errFileCmds = append(errFileCmds, "sudo mkdir -p /etc/haproxy/errors")
+	for _, info := range domain.SupportedErrorCodes {
+		path := fmt.Sprintf("/etc/haproxy/errors/%d.http", info.Code)
+		errFileCmds = append(errFileCmds, fmt.Sprintf("{ [ -f %s ] || sudo touch %s; }", path, path))
+	}
+	_, _ = s.sshClient.RunCommand(ctx, conn, strings.Join(errFileCmds, " && "))
 
 	// Push semua cert aktif yang dipakai domain ke node (agar haproxy -c dan reload tidak gagal)
 	s.pushCertsToNode(ctx, conn)
