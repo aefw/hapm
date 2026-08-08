@@ -698,6 +698,11 @@ CREATE TABLE IF NOT EXISTS waf_domain_bindings (
 CREATE INDEX IF NOT EXISTS idx_waf_domain_bindings
     ON waf_domain_bindings (rule_type, rule_id)`,
 	},
+	{
+		version: 44,
+		name:    "error_pages_add_429",
+		sql:     `INSERT OR IGNORE INTO error_pages (error_code) VALUES (429);`,
+	},
 }
 
 // RunMigrations menjalankan semua migrasi yang belum diaplikasikan.

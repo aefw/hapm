@@ -27,6 +27,7 @@ var SupportedErrorCodes = []ErrorCodeInfo{
 	{Code: 403, Message: "Forbidden"},
 	{Code: 404, Message: "Not Found"},
 	{Code: 408, Message: "Request Timeout"},
+	{Code: 429, Message: "Too Many Requests"},
 	{Code: 500, Message: "Internal Server Error"},
 	{Code: 502, Message: "Bad Gateway"},
 	{Code: 503, Message: "Service Unavailable"},
