@@ -19,9 +19,11 @@
 6. [Backend HTTPS & Forward Headers](#backend-https--forward-headers)
 7. [Node Statistics Management](#node-statistics-management)
 8. [Custom Error Pages](#custom-error-pages)
-9. [Security Design](#security-design)
-10. [Docker Deployment Plan](#docker-deployment-plan)
-11. [Development Task List](#development-task-list)
+9. [Web Application Firewall (WAF)](#web-application-firewall-waf)
+10. [Advanced Health Checks](#advanced-health-checks)
+11. [Security Design](#security-design)
+12. [Docker Deployment Plan](#docker-deployment-plan)
+13. [Development Task List](#development-task-list)
 
 ---
 
@@ -606,6 +608,41 @@ Melindungi domain routing dengan **HTTP Basic Auth** langsung di level HAProxy.
 | GET | `/api/v1/audit` | Admin+ | List audit log |
 | GET | `/api/v1/audit/{id}` | Admin+ | Get audit log by ID |
 
+**Parameter filter GET /api/v1/audit:**
+
+| Parameter | Keterangan |
+|---|---|
+| `q` | Keyword (action, resource_type, detail) |
+| `action` | Filter per action (contoh: `user.login`, `deploy.started`) |
+| `resource_type` | Filter per resource |
+| `start` / `limit` | Pagination |
+
+**Action yang tercatat:**
+
+| Kategori | Actions |
+|---|---|
+| Auth | `user.login`, `user.logout`, `user.login.failed`, `user.locked`, `user.password.changed`, `user.token.refreshed` |
+| User Management | `user.created`, `user.updated`, `user.deleted` |
+| Node | `node.created`, `node.updated`, `node.deleted`, `node.tested`, `node.provisioned` |
+| Backend | `backend.created`, `backend.updated`, `backend.deleted`, `backend.health_check.changed` |
+| Domain | `domain.created`, `domain.updated`, `domain.deleted` |
+| Certificate | `cert.created`, `cert.uploaded`, `cert.updated`, `cert.deleted`, `cert.issued`, `cert.renewed`, `cert.revoked`, `cert.deployed`, `cert.issue.failed`, `cert.renew.failed` |
+| Settings | `setting.updated` |
+| Deploy | `deploy.started`, `deploy.success`, `deploy.failed`, `deploy.rolled_back` |
+| Replication | `replication.pushed`, `replication.failed` |
+| Revision | `revision.restored` |
+| Service | `service.created`, `service.updated`, `service.deleted` |
+| WAF Rules | `waf.rule.created`, `waf.rule.updated`, `waf.rule.deleted`, `waf.feature.toggled` |
+| WAF Blacklist | `waf.blacklist.added`, `waf.blacklist.deleted` |
+| WAF Whitelist | `waf.whitelist.added`, `waf.whitelist.deleted` |
+| WAF Rate Limit | `waf.rate_limit.created`, `waf.rate_limit.updated`, `waf.rate_limit.deleted` |
+| WAF CORS | `waf.cors.created`, `waf.cors.updated`, `waf.cors.deleted` |
+| Error Page | `error_page.updated`, `error_page.feature.toggled` |
+
+> **IP Address:** Semua baris audit log menyimpan IP real client. IP diambil dari request context saat `RequireAuth` middleware berjalan — mengikuti chain `CF-Connecting-IP → X-Forwarded-For → src` sesuai konfigurasi `APP_PROXY_MODE`. Operasi background (deploy goroutine) tidak memiliki IP karena tidak ada HTTP request.
+
+> **Startup cleanup:** Saat server restart, deployment dengan status `running` atau `pending` yang tertinggal akibat crash server otomatis ditandai sebagai `failed` agar frontend tidak polling selamanya.
+
 ---
 
 ## Certificate Management Center (CMC)
@@ -872,7 +909,7 @@ Frontend dapat polling endpoint ini untuk menampilkan badge notifikasi. Alert hi
 
 | Method | Path | Role | Description |
 |---|---|---|---|
-| GET | `/api/v1/error-pages` | Admin+ | List semua konfigurasi error page (8 kode) |
+| GET | `/api/v1/error-pages` | Admin+ | List semua konfigurasi error page (9 kode) |
 | PUT | `/api/v1/error-pages/{code}` | Admin+ | Update konten HTML error page |
 | GET | `/api/v1/settings/features/error-pages` | Auth | Cek status fitur Custom Error Pages |
 | PUT | `/api/v1/settings/features/error-pages` | SuperAdmin | Enable/disable fitur Custom Error Pages |
@@ -892,7 +929,7 @@ Frontend dapat polling endpoint ini untuk menampilkan badge notifikasi. Alert hi
 { "content": "<html><body>Custom 404 page</body></html>", "enabled": true }
 ```
 
-> Kode yang didukung: `400`, `403`, `404`, `408`, `500`, `502`, `503`, `504`. Feature harus aktif untuk bisa menyimpan konten.
+> Kode yang didukung: `400`, `403`, `404`, `408`, `429`, `500`, `502`, `503`, `504`. Feature harus aktif untuk bisa menyimpan konten. `429` digunakan oleh WAF rate limiter — pastikan custom page-nya mencerminkan pesan "Too Many Requests".
 
 **PUT /api/v1/settings/features/error-pages** (SuperAdmin)
 ```json
@@ -957,7 +994,7 @@ Gunakan ketika backend memiliki virtual host dan health check harus menyertakan 
 
 ```
 option httpchk
-http-check send meth GET uri / ver HTTP/1.1 hdr Host journal.unicimi.ac.id
+http-check send meth GET uri / ver HTTP/1.1 hdr Host jurnal.indonetsoft.com
 http-check expect status 200-399
 ```
 
@@ -1116,7 +1153,7 @@ HAPM mendukung kustomisasi **halaman error HAProxy** (4xx/5xx) yang dapat dikelo
 
 ### Konsep
 
-- 8 kode error didukung: `400`, `403`, `404`, `408`, `500`, `502`, `503`, `504`
+- 9 kode error didukung: `400`, `403`, `404`, `408`, `429`, `500`, `502`, `503`, `504`
 - Konten HTML disimpan di database per kode
 - Saat Deploy Configuration, file `.http` di-upload ke node (`/etc/haproxy/errors/`)
 - Directive `errorfile` otomatis digenerate di bagian `defaults` pada `haproxy.cfg`
@@ -1177,6 +1214,181 @@ defaults
    - Upload tiap file ke `/tmp/hapm_error_{code}.http` via SSH
    - `sudo mv /tmp/hapm_error_{code}.http /etc/haproxy/errors/{code}.http`
 4. Directive `errorfile` otomatis termasuk di `haproxy.cfg` yang diupload
+
+---
+
+## Web Application Firewall (WAF)
+
+HAPM menyertakan WAF berbasis middleware Go yang berjalan **sebelum** request mencapai router API maupun frontend. WAF beroperasi di level aplikasi dan berlaku untuk **semua domain** yang dikelola HAPM. Fitur ini bersifat **premium** dan memerlukan lisensi aktif.
+
+### Arsitektur WAF
+
+```
+Internet → HAProxy Node → HAPM (port 8282)
+                              │
+                     ┌────────▼────────┐
+                     │  WAF Middleware  │  ← berjalan di Go process
+                     │  (pre-router)   │
+                     └────────┬────────┘
+                              │  pass / deny
+                     ┌────────▼────────┐
+                     │  Router + API   │
+                     └─────────────────┘
+```
+
+IP real client diidentifikasi dengan chain: `CF-Connecting-IP → X-Forwarded-For[0] → src`. Ini memastikan WAF mengenali IP asli meski traffic melewati Cloudflare Tunnel.
+
+### Komponen WAF
+
+| Komponen | Fungsi | HTTP Code |
+|---|---|---|
+| **Blacklist** | Blokir IP/CIDR secara manual atau permanen | 403 |
+| **Whitelist** | Bypass WAF untuk IP/CIDR terpercaya | — |
+| **Rules** | Blokir berdasarkan IP, path, User-Agent, atau header | 403 |
+| **Rate Limiter** | Batasi request per IP per window waktu | 429 |
+| **CORS** | Kelola header CORS per path pattern | 403 / response header |
+
+### WAF Endpoints
+
+#### Feature Flag
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/api/v1/settings/features/waf` | Auth | Status fitur WAF |
+| PUT | `/api/v1/settings/features/waf` | SuperAdmin | Enable/disable WAF (butuh lisensi) |
+
+#### WAF Rules
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/api/v1/waf/rules` | Auth | List semua WAF rule |
+| POST | `/api/v1/waf/rules` | Admin | Buat rule baru |
+| PUT | `/api/v1/waf/rules/{id}` | Admin | Update rule |
+| DELETE | `/api/v1/waf/rules/{id}` | Admin | Hapus rule |
+
+**Body POST/PUT:**
+```json
+{
+  "name": "Block scanner",
+  "rule_type": "ua_block",
+  "value": "sqlmap",
+  "action": "deny",
+  "enabled": true,
+  "domain_ids": []
+}
+```
+
+> `rule_type`: `ip_block` | `path_block` | `ua_block` | `header_block`
+> `action`: `deny` | `allow`
+> `domain_ids`: kosong = berlaku global, isi ID domain = scope ke domain tertentu
+
+#### WAF Blacklist
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/api/v1/waf/blacklist` | Auth | List blacklist entry |
+| POST | `/api/v1/waf/blacklist` | Admin | Tambah IP/CIDR ke blacklist |
+| DELETE | `/api/v1/waf/blacklist/{id}` | Admin | Hapus entry |
+
+```json
+POST /api/v1/waf/blacklist
+{
+  "ip_address": "203.0.113.42",
+  "reason": "Brute force attempt",
+  "expires_at": "2026-12-31T23:59:59Z",
+  "domain_ids": []
+}
+```
+
+> `ip_address` bisa berupa IP tunggal (`1.2.3.4`) atau CIDR (`1.2.3.0/24`).
+> `expires_at`: opsional (ISO 8601 RFC3339). Kosong = permanent.
+
+#### WAF Whitelist
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/api/v1/waf/whitelist` | Auth | List whitelist entry |
+| POST | `/api/v1/waf/whitelist` | SuperAdmin | Tambah IP/CIDR ke whitelist |
+| DELETE | `/api/v1/waf/whitelist/{id}` | SuperAdmin | Hapus entry |
+
+```json
+POST /api/v1/waf/whitelist
+{
+  "ip_address": "192.168.1.0/24",
+  "description": "Internal office network",
+  "expires_at": null,
+  "domain_ids": []
+}
+```
+
+#### WAF Rate Limiter
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/api/v1/waf/rate-limits` | Auth | List rate limit profile |
+| POST | `/api/v1/waf/rate-limits` | Admin | Buat profile baru |
+| PUT | `/api/v1/waf/rate-limits/{id}` | Admin | Update profile |
+| DELETE | `/api/v1/waf/rate-limits/{id}` | Admin | Hapus profile |
+
+```json
+POST /api/v1/waf/rate-limits
+{
+  "name": "API login throttle",
+  "path_pattern": "^/api/v1/auth/login$",
+  "max_requests": 10,
+  "window_seconds": 60,
+  "block_duration_seconds": 300,
+  "auto_blacklist_threshold": 5,
+  "enabled": true,
+  "domain_ids": []
+}
+```
+
+> IP yang melebihi `max_requests` dalam `window_seconds` akan mendapat respons **429 Too Many Requests**.
+> Jika `auto_blacklist_threshold` diisi dan IP tercatat melebihi batas sebanyak N kali, IP otomatis masuk blacklist.
+
+#### WAF CORS
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/api/v1/waf/cors` | Auth | List CORS rule |
+| POST | `/api/v1/waf/cors` | Admin | Buat rule CORS |
+| PUT | `/api/v1/waf/cors/{id}` | Admin | Update rule |
+| DELETE | `/api/v1/waf/cors/{id}` | Admin | Hapus rule |
+
+```json
+POST /api/v1/waf/cors
+{
+  "name": "Frontend app",
+  "path_pattern": "^/api/",
+  "allowed_origins": "[\"https://app.example.com\"]",
+  "allowed_methods": "GET,POST,PUT,DELETE,OPTIONS",
+  "allowed_headers": "Content-Type,Authorization",
+  "expose_headers": "",
+  "allow_credentials": true,
+  "max_age_seconds": 3600,
+  "enabled": true,
+  "priority": 10,
+  "domain_ids": []
+}
+```
+
+> `allowed_origins` adalah **JSON array string** (bukan array biasa). Wildcard `*` tidak boleh dikombinasikan dengan `allow_credentials: true`.
+
+### IP Normalization (Cloudflare Tunnel / Proxy)
+
+WAF mengenali IP real client dengan priority chain:
+
+```
+1. CF-Connecting-IP     ← Cloudflare Tunnel / proxy Cloudflare
+2. X-Forwarded-For[0]   ← Proxy/load balancer lain
+3. Remote IP            ← Koneksi langsung
+```
+
+Konfigurasi mode proxy di `.env`:
+```env
+APP_PROXY_MODE=cloudflare   # cloudflare | proxy | direct
+```
 
 ---
 
