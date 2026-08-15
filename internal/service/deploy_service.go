@@ -288,7 +288,9 @@ func (s *deployService) runPipeline(ctx context.Context, deployment *domain.Depl
 			fmt.Sprintf("sudo cp %s /etc/haproxy/haproxy.cfg && sudo systemctl reload haproxy", backupPath))
 	}
 
-	reloadOut, err := s.sshClient.RunCommand(ctx, conn, "sudo systemctl reload haproxy 2>&1")
+	reloadCtx, reloadCancel := context.WithTimeout(ctx, 60*time.Second)
+	defer reloadCancel()
+	reloadOut, err := s.sshClient.RunCommand(reloadCtx, conn, "sudo systemctl reload haproxy 2>&1")
 	if err != nil {
 		doRollback()
 		updateStatus(domain.DeployStatusRolledBack, domain.DeployStageRollback,
@@ -301,7 +303,9 @@ func (s *deployService) runPipeline(ctx context.Context, deployment *domain.Depl
 	updateStatus(domain.DeployStatusRunning, domain.DeployStageVerify, "")
 
 	time.Sleep(2 * time.Second)
-	statusOut, _ := s.sshClient.RunCommand(ctx, conn, "systemctl is-active haproxy 2>&1")
+	verifyCtx, verifyCancel := context.WithTimeout(ctx, 15*time.Second)
+	defer verifyCancel()
+	statusOut, _ := s.sshClient.RunCommand(verifyCtx, conn, "sudo systemctl is-active haproxy 2>&1")
 	if strings.TrimSpace(statusOut) != "active" {
 		doRollback()
 		updateStatus(domain.DeployStatusRolledBack, domain.DeployStageRollback,
