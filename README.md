@@ -947,6 +947,53 @@ Backend Pool mendukung berbagai metode health check. Lihat field `health_check_t
 | `REDIS` | `option tcp-check` + PING/PONG |
 | `CUSTOM` | raw directives dari `health_check_config.custom` |
 
+### Contoh Custom Health Check
+
+> **Penting:** Gunakan syntax HAProxy 2.2+ / 3.x. Syntax lama `option httpchk GET /path HTTP/1.1\r\nHost: example.com` sudah tidak didukung dan akan menyebabkan error validasi config.
+
+#### HTTP check dengan Host header (untuk vhost / virtual hosting)
+
+Gunakan ketika backend memiliki virtual host dan health check harus menyertakan `Host` header yang benar:
+
+```
+option httpchk
+http-check send meth GET uri / ver HTTP/1.1 hdr Host journal.unicimi.ac.id
+http-check expect status 200-399
+```
+
+#### HTTP check ke path tertentu dengan Host header
+
+```
+option httpchk
+http-check send meth GET uri /health ver HTTP/1.1 hdr Host api.example.com
+http-check expect status 200
+```
+
+#### TCP check — SMTP
+
+```
+option tcp-check
+tcp-check send QUIT\r\n
+tcp-check expect string +OK
+```
+
+#### TCP check — Redis
+
+```
+option tcp-check
+tcp-check send PING\r\n
+tcp-check expect string +PONG
+```
+
+#### TCP check — custom protokol (FTP)
+
+```
+option tcp-check
+tcp-check expect string 220
+```
+
+> Field yang perlu diisi di UI: pilih **Health Check Type = CUSTOM**, lalu isi textarea **Custom Directives** dengan salah satu contoh di atas (satu baris per direktif, tanpa indentasi).
+
 ---
 
 ## Backend HTTPS & Forward Headers
