@@ -117,7 +117,7 @@ func (s *configService) GenerateForNode(ctx context.Context, nodeID int) (*domai
 	// Load WAF config jika feature aktif
 	var wafConfig *domain.WAFConfig
 	var wafBlacklistMap, wafWhitelistMap string
-	if wafEnabled, _ := s.settingRepo.Get(ctx, domain.SettingWAFEnabled); wafEnabled.Value == "true" && s.wafGenRepo != nil {
+	if wafEnabled, _ := s.settingRepo.Get(ctx, domain.SettingWAFEnabled); wafEnabled != nil && wafEnabled.Value == "true" && s.wafGenRepo != nil {
 		if wc, err := s.wafGenRepo.LoadForGeneration(ctx); err == nil {
 			wafConfig = wc
 			wafBlacklistMap = buildBlacklistMap(wc.Blacklist)
