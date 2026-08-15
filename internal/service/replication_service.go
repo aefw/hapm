@@ -157,9 +157,25 @@ func (s *replicationService) PushReplication(ctx context.Context, targetID int, 
 
 // executePush menjalankan proses replikasi dari source ke target node
 func (s *replicationService) executePush(ctx context.Context, job *domain.ReplicationJob, target *domain.ReplicationTarget) {
+	var failMsg string
 	updateJob := func(status, errMsg string) {
 		_ = s.replicationRepo.UpdateJobStatus(ctx, job.ID, status, errMsg)
+		if status == "failed" {
+			failMsg = errMsg
+		}
 	}
+
+	defer func() {
+		if failMsg != "" {
+			_ = s.auditSvc.Log(ctx, &domain.AuditLog{
+				UserID:       job.UserID,
+				Action:       domain.AuditActionReplicationFailed,
+				ResourceType: "replication_job",
+				ResourceID:   &job.ID,
+				Detail:       fmt.Sprintf("Replication failed: node %d → node %d: %s", target.SourceNodeID, target.TargetNodeID, failMsg),
+			})
+		}
+	}()
 
 	// Generate config dari source node
 	generated, err := s.configSvc.GenerateForNode(ctx, target.SourceNodeID)
@@ -196,7 +212,7 @@ func (s *replicationService) executePush(ctx context.Context, job *domain.Replic
 	}
 
 	// Reload HAProxy pada target node
-	if _, err := s.sshClient.RunCommand(ctx, conn, "systemctl reload haproxy"); err != nil {
+	if _, err := s.sshClient.RunCommand(ctx, conn, "sudo systemctl reload haproxy"); err != nil {
 		updateJob("failed", fmt.Sprintf("reload haproxy: %v", err))
 		return
 	}

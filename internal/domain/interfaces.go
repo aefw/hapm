@@ -154,6 +154,9 @@ type DeploymentRepository interface {
 	ListRecent(ctx context.Context, limit int) ([]*Deployment, error)
 	Create(ctx context.Context, d *Deployment) (int, error)
 	UpdateStatus(ctx context.Context, id int, status DeployStatus, stage DeployStage, errMsg string) error
+	// MarkStaleRunning menandai semua deployment berstatus pending/running sebagai failed.
+	// Dipanggil saat server startup untuk membersihkan deployment yang terputus akibat crash.
+	MarkStaleRunning(ctx context.Context) (int64, error)
 }
 
 // ReplicationRepository mendefinisikan kontrak akses data Replication

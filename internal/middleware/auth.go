@@ -7,6 +7,7 @@ import (
 	"github.com/aefw/hapm/internal/config"
 	"github.com/aefw/hapm/internal/core"
 	"github.com/aefw/hapm/internal/security"
+	"github.com/aefw/hapm/pkg/iputil"
 )
 
 // RequireAuth membungkus HandlerFunc dengan validasi JWT access token.
@@ -29,6 +30,7 @@ func RequireAuth(cfg *config.Config, handler core.HandlerFunc) core.HandlerFunc 
 		}
 
 		ctx := core.SetUserContext(r.Context(), claims.UserID, claims.Username, claims.Role)
+		ctx = core.SetClientIP(ctx, iputil.RealIP(r, iputil.Mode(cfg.Proxy.Mode)))
 		handler(w, r.WithContext(ctx), params)
 	}
 }

@@ -141,10 +141,19 @@ func main() {
 	var _ domain.AuthGroupService = authGroupSvc
 	var _ domain.SNService = snSvc
 
-	// ─── 6. Inisialisasi router ─────────────────────────────────────
+	// ─── 6. Cleanup deployment stuck saat startup ──────────────────
+	// Deployment berstatus running/pending yang tersisa dari server crash/panic
+	// tidak akan pernah selesai — tandai sebagai failed agar frontend tidak polling selamanya.
+	if n, err := deployRepo.MarkStaleRunning(context.Background()); err != nil {
+		log.Printf("[WARN] startup: gagal cleanup stale deployments: %v", err)
+	} else if n > 0 {
+		log.Printf("[STARTUP] %d deployment stale (running/pending) ditandai failed", n)
+	}
+
+	// ─── 7. Inisialisasi router ─────────────────────────────────────
 	router := core.NewRouter()
 
-	// ─── 7. Inisialisasi handlers ───────────────────────────────────
+	// ─── 8. Inisialisasi handlers ───────────────────────────────────
 	handler.RegisterAuthRoutes(router, cfg, authSvc)
 	handler.RegisterUserRoutes(router, cfg, userSvc)
 	handler.RegisterNodeRoutes(router, cfg, nodeSvc)
@@ -162,19 +171,19 @@ func main() {
 	handler.RegisterDashboardRoutes(router, cfg, dashboardSvc)
 	handler.RegisterHAProxyAuthRoutes(router, cfg, authUserSvc, authGroupSvc)
 	handler.RegisterAlertRoutes(router, cfg, certRepo, certDeployRepo)
-	handler.RegisterErrorPageRoutes(router, cfg, errorPageRepo, settingsSvc, snSvc)
-	handler.RegisterWAFRoutes(router, cfg, wafRuleRepo, settingsSvc, snSvc)
-	handler.RegisterWAFBlacklistRoutes(router, cfg, wafBlacklistRepo, settingsSvc)
-	handler.RegisterWAFWhitelistRoutes(router, cfg, wafWhitelistRepo, settingsSvc)
-	handler.RegisterWAFRateLimitRoutes(router, cfg, wafRateLimitRepo, settingsSvc)
-	handler.RegisterWAFCORSRoutes(router, cfg, wafCORSRepo, settingsSvc)
+	handler.RegisterErrorPageRoutes(router, cfg, errorPageRepo, settingsSvc, snSvc, auditSvc)
+	handler.RegisterWAFRoutes(router, cfg, wafRuleRepo, settingsSvc, snSvc, auditSvc)
+	handler.RegisterWAFBlacklistRoutes(router, cfg, wafBlacklistRepo, settingsSvc, auditSvc)
+	handler.RegisterWAFWhitelistRoutes(router, cfg, wafWhitelistRepo, settingsSvc, auditSvc)
+	handler.RegisterWAFRateLimitRoutes(router, cfg, wafRateLimitRepo, settingsSvc, auditSvc)
+	handler.RegisterWAFCORSRoutes(router, cfg, wafCORSRepo, settingsSvc, auditSvc)
 	handler.RegisterLicRoutes(router, cfg, snSvc)
 
-	// ─── 8. Jalankan scheduler CMC ─────────────────────────────────
+	// ─── 9. Jalankan scheduler CMC ─────────────────────────────────
 	ctx := context.Background()
 	schedulerSvc.Start(ctx)
 
-	// ─── 9. Bangun middleware stack ─────────────────────────────────
+	// ─── 10. Bangun middleware stack ────────────────────────────────
 	// Mux utama: /api/ → router (API), / → frontend SPA
 	mainMux := http.NewServeMux()
 	mainMux.Handle("/api/", router)
@@ -189,7 +198,7 @@ func main() {
 	h = middleware.NewCORSMiddleware(h, cfg)
 	h = middleware.NewSecurityHeadersMiddleware(h)
 
-	// ─── 10. Jalankan aplikasi ──────────────────────────────────────
+	// ─── 11. Jalankan aplikasi ──────────────────────────────────────
 	app := core.NewApp(cfg, router)
 	if err := app.Run(h); err != nil {
 		log.Fatalf("[FATAL] %v", err)

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"strconv"
@@ -18,6 +19,7 @@ type WAFBlacklistHandler struct {
 	cfg         *config.Config
 	repo        domain.WAFBlacklistRepository
 	settingsSvc domain.SettingsService
+	auditSvc    domain.AuditService
 }
 
 func RegisterWAFBlacklistRoutes(
@@ -25,8 +27,9 @@ func RegisterWAFBlacklistRoutes(
 	cfg *config.Config,
 	repo domain.WAFBlacklistRepository,
 	settingsSvc domain.SettingsService,
+	auditSvc domain.AuditService,
 ) {
-	h := &WAFBlacklistHandler{cfg: cfg, repo: repo, settingsSvc: settingsSvc}
+	h := &WAFBlacklistHandler{cfg: cfg, repo: repo, settingsSvc: settingsSvc, auditSvc: auditSvc}
 	router.GET("/api/v1/waf/blacklist", middleware.RequireAuth(cfg, h.List))
 	router.POST("/api/v1/waf/blacklist", middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleAdmin, h.Create)))
 	router.DELETE("/api/v1/waf/blacklist/{id}", middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleAdmin, h.Delete)))
@@ -102,6 +105,12 @@ func (h *WAFBlacklistHandler) Create(w http.ResponseWriter, r *http.Request, _ [
 		core.Error(w, http.StatusInternalServerError, "Gagal menyimpan blacklist entry: "+err.Error())
 		return
 	}
+
+	actorID := core.GetUserID(ctx)
+	_ = h.auditSvc.Log(ctx, &domain.AuditLog{
+		UserID: &actorID, Action: domain.AuditActionWAFBlacklistAdded, ResourceType: "waf_blacklist",
+		Detail: fmt.Sprintf("IP %s ditambahkan ke blacklist WAF (alasan: %s)", bl.IPAddress, bl.Reason),
+	})
 	core.Success(w, "blacklist", bl)
 }
 
@@ -130,6 +139,12 @@ func (h *WAFBlacklistHandler) Delete(w http.ResponseWriter, r *http.Request, par
 		core.Error(w, http.StatusInternalServerError, "Gagal menghapus blacklist entry: "+err.Error())
 		return
 	}
+
+	actorID := core.GetUserID(ctx)
+	_ = h.auditSvc.Log(ctx, &domain.AuditLog{
+		UserID: &actorID, Action: domain.AuditActionWAFBlacklistDeleted, ResourceType: "waf_blacklist", ResourceID: &id,
+		Detail: fmt.Sprintf("Blacklist entry ID %d dihapus dari WAF", id),
+	})
 	core.Success(w, "message", "Blacklist entry berhasil dihapus")
 }
 

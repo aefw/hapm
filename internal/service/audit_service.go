@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/aefw/hapm/internal/config"
+	"github.com/aefw/hapm/internal/core"
 	"github.com/aefw/hapm/internal/domain"
 	"github.com/aefw/hapm/pkg/iputil"
 )
@@ -23,8 +24,12 @@ func NewAuditService(cfg *config.Config, repo domain.AuditRepository) domain.Aud
 	}
 }
 
-// Log mencatat audit log ke database
+// Log mencatat audit log ke database.
+// Jika IPAddress belum diisi, otomatis diambil dari context (disimpan saat RequireAuth).
 func (s *auditService) Log(ctx context.Context, log *domain.AuditLog) error {
+	if log.IPAddress == "" {
+		log.IPAddress = core.GetClientIP(ctx)
+	}
 	return s.repo.Create(ctx, log)
 }
 

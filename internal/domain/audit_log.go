@@ -79,6 +79,34 @@ const (
 	AuditActionServiceCreated = "service.created"
 	AuditActionServiceUpdated = "service.updated"
 	AuditActionServiceDeleted = "service.deleted"
+
+	// WAF Rules
+	AuditActionWAFRuleCreated      = "waf.rule.created"
+	AuditActionWAFRuleUpdated      = "waf.rule.updated"
+	AuditActionWAFRuleDeleted      = "waf.rule.deleted"
+	AuditActionWAFFeatureToggled   = "waf.feature.toggled"
+
+	// WAF Blacklist
+	AuditActionWAFBlacklistAdded   = "waf.blacklist.added"
+	AuditActionWAFBlacklistDeleted = "waf.blacklist.deleted"
+
+	// WAF Whitelist
+	AuditActionWAFWhitelistAdded   = "waf.whitelist.added"
+	AuditActionWAFWhitelistDeleted = "waf.whitelist.deleted"
+
+	// WAF Rate Limit
+	AuditActionWAFRateLimitCreated = "waf.rate_limit.created"
+	AuditActionWAFRateLimitUpdated = "waf.rate_limit.updated"
+	AuditActionWAFRateLimitDeleted = "waf.rate_limit.deleted"
+
+	// WAF CORS
+	AuditActionWAFCORSCreated      = "waf.cors.created"
+	AuditActionWAFCORSUpdated      = "waf.cors.updated"
+	AuditActionWAFCORSDeleted      = "waf.cors.deleted"
+
+	// Error Page
+	AuditActionErrorPageUpdated        = "error_page.updated"
+	AuditActionErrorPageFeatureToggled = "error_page.feature.toggled"
 )
 
 // AuditFilter adalah filter untuk query audit log

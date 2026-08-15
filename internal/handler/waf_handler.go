@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ type WAFHandler struct {
 	repo        domain.WAFRuleRepository
 	settingsSvc domain.SettingsService
 	snSvc       domain.SNService
+	auditSvc    domain.AuditService
 }
 
 func RegisterWAFRoutes(
@@ -25,8 +27,9 @@ func RegisterWAFRoutes(
 	repo domain.WAFRuleRepository,
 	settingsSvc domain.SettingsService,
 	snSvc domain.SNService,
+	auditSvc domain.AuditService,
 ) {
-	h := &WAFHandler{cfg: cfg, repo: repo, settingsSvc: settingsSvc, snSvc: snSvc}
+	h := &WAFHandler{cfg: cfg, repo: repo, settingsSvc: settingsSvc, snSvc: snSvc, auditSvc: auditSvc}
 	router.GET("/api/v1/waf/rules", middleware.RequireAuth(cfg, h.List))
 	router.POST("/api/v1/waf/rules", middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleAdmin, h.Create)))
 	router.PUT("/api/v1/waf/rules/{id}", middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleAdmin, h.Update)))
@@ -117,6 +120,11 @@ func (h *WAFHandler) Create(w http.ResponseWriter, r *http.Request, _ []string) 
 		return
 	}
 
+	actorID := core.GetUserID(ctx)
+	_ = h.auditSvc.Log(ctx, &domain.AuditLog{
+		UserID: &actorID, Action: domain.AuditActionWAFRuleCreated, ResourceType: "waf_rule",
+		Detail: fmt.Sprintf("WAF rule '%s' (type: %s, action: %s) dibuat", rule.Name, rule.RuleType, rule.Action),
+	})
 	core.Success(w, "rule", rule)
 }
 
@@ -164,6 +172,11 @@ func (h *WAFHandler) Update(w http.ResponseWriter, r *http.Request, params []str
 		return
 	}
 
+	actorID := core.GetUserID(ctx)
+	_ = h.auditSvc.Log(ctx, &domain.AuditLog{
+		UserID: &actorID, Action: domain.AuditActionWAFRuleUpdated, ResourceType: "waf_rule", ResourceID: &id,
+		Detail: fmt.Sprintf("WAF rule '%s' diperbarui", rule.Name),
+	})
 	core.Success(w, "rule", rule)
 }
 
@@ -193,6 +206,11 @@ func (h *WAFHandler) Delete(w http.ResponseWriter, r *http.Request, params []str
 		return
 	}
 
+	actorID := core.GetUserID(ctx)
+	_ = h.auditSvc.Log(ctx, &domain.AuditLog{
+		UserID: &actorID, Action: domain.AuditActionWAFRuleDeleted, ResourceType: "waf_rule", ResourceID: &id,
+		Detail: fmt.Sprintf("WAF rule ID %d dihapus", id),
+	})
 	core.Success(w, "message", "WAF rule berhasil dihapus")
 }
 
@@ -233,6 +251,11 @@ func (h *WAFHandler) SetFeature(w http.ResponseWriter, r *http.Request, _ []stri
 		return
 	}
 
+	actorID := core.GetUserID(ctx)
+	_ = h.auditSvc.Log(ctx, &domain.AuditLog{
+		UserID: &actorID, Action: domain.AuditActionWAFFeatureToggled, ResourceType: "setting",
+		Detail: fmt.Sprintf("Fitur WAF %s", map[bool]string{true: "diaktifkan", false: "dinonaktifkan"}[req.Enabled]),
+	})
 	core.Success(w, "feature", map[string]interface{}{
 		"key":     "waf",
 		"enabled": req.Enabled,

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ type WAFWhitelistHandler struct {
 	cfg         *config.Config
 	repo        domain.WAFWhitelistRepository
 	settingsSvc domain.SettingsService
+	auditSvc    domain.AuditService
 }
 
 func RegisterWAFWhitelistRoutes(
@@ -24,8 +26,9 @@ func RegisterWAFWhitelistRoutes(
 	cfg *config.Config,
 	repo domain.WAFWhitelistRepository,
 	settingsSvc domain.SettingsService,
+	auditSvc domain.AuditService,
 ) {
-	h := &WAFWhitelistHandler{cfg: cfg, repo: repo, settingsSvc: settingsSvc}
+	h := &WAFWhitelistHandler{cfg: cfg, repo: repo, settingsSvc: settingsSvc, auditSvc: auditSvc}
 	router.GET("/api/v1/waf/whitelist", middleware.RequireAuth(cfg, h.List))
 	router.POST("/api/v1/waf/whitelist", middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleSuperAdmin, h.Create)))
 	router.DELETE("/api/v1/waf/whitelist/{id}", middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleSuperAdmin, h.Delete)))
@@ -101,6 +104,12 @@ func (h *WAFWhitelistHandler) Create(w http.ResponseWriter, r *http.Request, _ [
 		core.Error(w, http.StatusInternalServerError, "Gagal menyimpan whitelist entry: "+err.Error())
 		return
 	}
+
+	actorID := core.GetUserID(ctx)
+	_ = h.auditSvc.Log(ctx, &domain.AuditLog{
+		UserID: &actorID, Action: domain.AuditActionWAFWhitelistAdded, ResourceType: "waf_whitelist",
+		Detail: fmt.Sprintf("IP %s ditambahkan ke whitelist WAF", wl.IPAddress),
+	})
 	core.Success(w, "whitelist", wl)
 }
 
@@ -129,5 +138,11 @@ func (h *WAFWhitelistHandler) Delete(w http.ResponseWriter, r *http.Request, par
 		core.Error(w, http.StatusInternalServerError, "Gagal menghapus whitelist entry: "+err.Error())
 		return
 	}
+
+	actorID := core.GetUserID(ctx)
+	_ = h.auditSvc.Log(ctx, &domain.AuditLog{
+		UserID: &actorID, Action: domain.AuditActionWAFWhitelistDeleted, ResourceType: "waf_whitelist", ResourceID: &id,
+		Detail: fmt.Sprintf("Whitelist entry ID %d dihapus dari WAF", id),
+	})
 	core.Success(w, "message", "Whitelist entry berhasil dihapus")
 }

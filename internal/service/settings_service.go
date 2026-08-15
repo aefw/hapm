@@ -89,7 +89,14 @@ func (s *settingsService) GetACMEEmail(ctx context.Context) (string, error) {
 }
 
 func (s *settingsService) SetACMEEmail(ctx context.Context, email string) error {
-	return s.repo.Set(ctx, domain.SettingACMEEmail, email, false)
+	if err := s.repo.Set(ctx, domain.SettingACMEEmail, email, false); err != nil {
+		return err
+	}
+	_ = s.auditSvc.Log(ctx, &domain.AuditLog{
+		Action: domain.AuditActionSettingUpdated, ResourceType: "setting",
+		Detail: fmt.Sprintf("ACME email diubah ke %s", email),
+	})
+	return nil
 }
 
 func (s *settingsService) IsACMEStaging(ctx context.Context) (bool, error) {
@@ -101,31 +108,52 @@ func (s *settingsService) IsACMEStaging(ctx context.Context) (bool, error) {
 }
 
 func (s *settingsService) SetACMEStaging(ctx context.Context, staging bool) error {
-	return s.repo.Set(ctx, domain.SettingACMEStaging, strconv.FormatBool(staging), false)
+	if err := s.repo.Set(ctx, domain.SettingACMEStaging, strconv.FormatBool(staging), false); err != nil {
+		return err
+	}
+	_ = s.auditSvc.Log(ctx, &domain.AuditLog{
+		Action: domain.AuditActionSettingUpdated, ResourceType: "setting",
+		Detail: fmt.Sprintf("ACME staging diubah ke %v", staging),
+	})
+	return nil
 }
 
 func (s *settingsService) IsCustomErrorPagesEnabled(ctx context.Context) (bool, error) {
 	setting, err := s.repo.Get(ctx, domain.SettingCustomErrorPages)
 	if err != nil {
-		return false, nil // default: disabled
+		return false, nil
 	}
 	return setting.Value == "true", nil
 }
 
 func (s *settingsService) SetCustomErrorPagesEnabled(ctx context.Context, enabled bool) error {
-	return s.repo.Set(ctx, domain.SettingCustomErrorPages, strconv.FormatBool(enabled), false)
+	if err := s.repo.Set(ctx, domain.SettingCustomErrorPages, strconv.FormatBool(enabled), false); err != nil {
+		return err
+	}
+	_ = s.auditSvc.Log(ctx, &domain.AuditLog{
+		Action: domain.AuditActionSettingUpdated, ResourceType: "setting",
+		Detail: fmt.Sprintf("Custom error pages %s", map[bool]string{true: "diaktifkan", false: "dinonaktifkan"}[enabled]),
+	})
+	return nil
 }
 
 func (s *settingsService) IsWAFEnabled(ctx context.Context) (bool, error) {
 	setting, err := s.repo.Get(ctx, domain.SettingWAFEnabled)
 	if err != nil {
-		return false, nil // default: disabled
+		return false, nil
 	}
 	return setting.Value == "true", nil
 }
 
 func (s *settingsService) SetWAFEnabled(ctx context.Context, enabled bool) error {
-	return s.repo.Set(ctx, domain.SettingWAFEnabled, strconv.FormatBool(enabled), false)
+	if err := s.repo.Set(ctx, domain.SettingWAFEnabled, strconv.FormatBool(enabled), false); err != nil {
+		return err
+	}
+	_ = s.auditSvc.Log(ctx, &domain.AuditLog{
+		Action: domain.AuditActionSettingUpdated, ResourceType: "setting",
+		Detail: fmt.Sprintf("WAF %s", map[bool]string{true: "diaktifkan", false: "dinonaktifkan"}[enabled]),
+	})
+	return nil
 }
 
 // ─── Cloudflare API helpers ───────────────────────────────────────────────────

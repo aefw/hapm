@@ -108,6 +108,19 @@ func (r *DeploymentRepository) UpdateStatus(ctx context.Context, id int, status 
 	return err
 }
 
+func (r *DeploymentRepository) MarkStaleRunning(ctx context.Context) (int64, error) {
+	q := `UPDATE deployments
+	      SET status='failed', error_message='deployment terputus saat server restart',
+	          finished_at=CURRENT_TIMESTAMP, timestamp=CURRENT_TIMESTAMP
+	      WHERE status IN ('pending','running')`
+	res, err := r.db.ExecContext(ctx, q)
+	if err != nil {
+		return 0, fmt.Errorf("mark stale running: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
+}
+
 func scanDeployment(s scanner) (*domain.Deployment, error) {
 	var d domain.Deployment
 	var nodeName, username sql.NullString

@@ -177,7 +177,14 @@ func (s *authService) Logout(ctx context.Context, userID int, refreshToken strin
 	if rt.UserID != userID {
 		return ErrTokenInvalid
 	}
-	return s.refreshTokenRepo.Revoke(ctx, rt.ID)
+	if err := s.refreshTokenRepo.Revoke(ctx, rt.ID); err != nil {
+		return err
+	}
+	_ = s.auditSvc.Log(ctx, &domain.AuditLog{
+		UserID: &userID, Action: domain.AuditActionUserLogout,
+		ResourceType: "auth", Detail: fmt.Sprintf("User ID %d logged out", userID),
+	})
+	return nil
 }
 
 // RefreshToken memvalidasi refresh token dan menerbitkan pasangan token baru (rotation)
@@ -239,6 +246,10 @@ func (s *authService) RefreshToken(ctx context.Context, req *domain.RefreshReque
 		return nil, fmt.Errorf("auth: store refresh token: %w", err)
 	}
 
+	_ = s.auditSvc.Log(ctx, &domain.AuditLog{
+		UserID: &user.ID, Action: domain.AuditActionTokenRefreshed,
+		ResourceType: "auth", Detail: fmt.Sprintf("Token refreshed for user %s", user.Username),
+	})
 	return &domain.RefreshResponse{
 		AccessToken:  accessToken,
 		RefreshToken: newRefreshToken,
@@ -287,5 +298,9 @@ func (s *authService) ChangePassword(ctx context.Context, userID int, req *domai
 	// Cabut semua refresh token — paksa re-login di semua device
 	_ = s.refreshTokenRepo.RevokeAllByUser(ctx, userID)
 
+	_ = s.auditSvc.Log(ctx, &domain.AuditLog{
+		UserID: &userID, Action: domain.AuditActionPasswordChanged,
+		ResourceType: "auth", Detail: fmt.Sprintf("Password changed for user ID %d", userID),
+	})
 	return nil
 }

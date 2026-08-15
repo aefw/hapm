@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -17,6 +18,7 @@ type WAFRateLimitHandler struct {
 	cfg         *config.Config
 	repo        domain.WAFRateLimitRepository
 	settingsSvc domain.SettingsService
+	auditSvc    domain.AuditService
 }
 
 func RegisterWAFRateLimitRoutes(
@@ -24,8 +26,9 @@ func RegisterWAFRateLimitRoutes(
 	cfg *config.Config,
 	repo domain.WAFRateLimitRepository,
 	settingsSvc domain.SettingsService,
+	auditSvc domain.AuditService,
 ) {
-	h := &WAFRateLimitHandler{cfg: cfg, repo: repo, settingsSvc: settingsSvc}
+	h := &WAFRateLimitHandler{cfg: cfg, repo: repo, settingsSvc: settingsSvc, auditSvc: auditSvc}
 	router.GET("/api/v1/waf/rate-limits", middleware.RequireAuth(cfg, h.List))
 	router.POST("/api/v1/waf/rate-limits", middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleAdmin, h.Create)))
 	router.PUT("/api/v1/waf/rate-limits/{id}", middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleAdmin, h.Update)))
@@ -118,6 +121,12 @@ func (h *WAFRateLimitHandler) Create(w http.ResponseWriter, r *http.Request, _ [
 		core.Error(w, http.StatusInternalServerError, "Gagal menyimpan rate limit profile: "+err.Error())
 		return
 	}
+
+	actorID := core.GetUserID(ctx)
+	_ = h.auditSvc.Log(ctx, &domain.AuditLog{
+		UserID: &actorID, Action: domain.AuditActionWAFRateLimitCreated, ResourceType: "waf_rate_limit",
+		Detail: fmt.Sprintf("Rate limit profile '%s' dibuat (max %d req/%ds)", rl.Name, rl.MaxRequests, rl.WindowSeconds),
+	})
 	core.Success(w, "rate_limit", rl)
 }
 
@@ -166,6 +175,12 @@ func (h *WAFRateLimitHandler) Update(w http.ResponseWriter, r *http.Request, par
 		core.Error(w, http.StatusInternalServerError, "Gagal memperbarui rate limit profile: "+err.Error())
 		return
 	}
+
+	actorID := core.GetUserID(ctx)
+	_ = h.auditSvc.Log(ctx, &domain.AuditLog{
+		UserID: &actorID, Action: domain.AuditActionWAFRateLimitUpdated, ResourceType: "waf_rate_limit", ResourceID: &id,
+		Detail: fmt.Sprintf("Rate limit profile '%s' diperbarui", rl.Name),
+	})
 	core.Success(w, "rate_limit", rl)
 }
 
@@ -194,5 +209,11 @@ func (h *WAFRateLimitHandler) Delete(w http.ResponseWriter, r *http.Request, par
 		core.Error(w, http.StatusInternalServerError, "Gagal menghapus rate limit profile: "+err.Error())
 		return
 	}
+
+	actorID := core.GetUserID(ctx)
+	_ = h.auditSvc.Log(ctx, &domain.AuditLog{
+		UserID: &actorID, Action: domain.AuditActionWAFRateLimitDeleted, ResourceType: "waf_rate_limit", ResourceID: &id,
+		Detail: fmt.Sprintf("Rate limit profile ID %d dihapus", id),
+	})
 	core.Success(w, "message", "Rate limit profile berhasil dihapus")
 }

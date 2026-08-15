@@ -14,6 +14,8 @@ const (
 	ContextKeyRole contextKey = "role"
 	// ContextKeyRequestID menyimpan unique request ID untuk tracing
 	ContextKeyRequestID contextKey = "request_id"
+	// ContextKeyClientIP menyimpan IP nyata client dari HTTP request
+	ContextKeyClientIP contextKey = "client_ip"
 )
 
 // SetUserContext menyimpan user info ke dalam context
@@ -22,6 +24,19 @@ func SetUserContext(ctx context.Context, userID int, username, role string) cont
 	ctx = context.WithValue(ctx, ContextKeyUsername, username)
 	ctx = context.WithValue(ctx, ContextKeyRole, role)
 	return ctx
+}
+
+// SetClientIP menyimpan IP client ke dalam context
+func SetClientIP(ctx context.Context, ip string) context.Context {
+	return context.WithValue(ctx, ContextKeyClientIP, ip)
+}
+
+// GetClientIP mengambil IP client dari context. Mengembalikan "" jika tidak ada.
+func GetClientIP(ctx context.Context) string {
+	if v, ok := ctx.Value(ContextKeyClientIP).(string); ok {
+		return v
+	}
+	return ""
 }
 
 // GetUserID mengambil user ID dari context. Mengembalikan 0 jika tidak ada.

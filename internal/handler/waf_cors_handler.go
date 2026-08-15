@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -17,6 +18,7 @@ type WAFCORSHandler struct {
 	cfg         *config.Config
 	repo        domain.WAFCORSRepository
 	settingsSvc domain.SettingsService
+	auditSvc    domain.AuditService
 }
 
 func RegisterWAFCORSRoutes(
@@ -24,8 +26,9 @@ func RegisterWAFCORSRoutes(
 	cfg *config.Config,
 	repo domain.WAFCORSRepository,
 	settingsSvc domain.SettingsService,
+	auditSvc domain.AuditService,
 ) {
-	h := &WAFCORSHandler{cfg: cfg, repo: repo, settingsSvc: settingsSvc}
+	h := &WAFCORSHandler{cfg: cfg, repo: repo, settingsSvc: settingsSvc, auditSvc: auditSvc}
 	router.GET("/api/v1/waf/cors", middleware.RequireAuth(cfg, h.List))
 	router.POST("/api/v1/waf/cors", middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleAdmin, h.Create)))
 	router.PUT("/api/v1/waf/cors/{id}", middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleAdmin, h.Update)))
@@ -139,6 +142,12 @@ func (h *WAFCORSHandler) Create(w http.ResponseWriter, r *http.Request, _ []stri
 		core.Error(w, http.StatusInternalServerError, "Gagal menyimpan CORS rule: "+err.Error())
 		return
 	}
+
+	actorID := core.GetUserID(ctx)
+	_ = h.auditSvc.Log(ctx, &domain.AuditLog{
+		UserID: &actorID, Action: domain.AuditActionWAFCORSCreated, ResourceType: "waf_cors",
+		Detail: fmt.Sprintf("CORS rule '%s' dibuat (path: %s)", rule.Name, rule.PathPattern),
+	})
 	core.Success(w, "cors_rule", rule)
 }
 
@@ -193,6 +202,12 @@ func (h *WAFCORSHandler) Update(w http.ResponseWriter, r *http.Request, params [
 		core.Error(w, http.StatusInternalServerError, "Gagal memperbarui CORS rule: "+err.Error())
 		return
 	}
+
+	actorID := core.GetUserID(ctx)
+	_ = h.auditSvc.Log(ctx, &domain.AuditLog{
+		UserID: &actorID, Action: domain.AuditActionWAFCORSUpdated, ResourceType: "waf_cors", ResourceID: &id,
+		Detail: fmt.Sprintf("CORS rule '%s' diperbarui", rule.Name),
+	})
 	core.Success(w, "cors_rule", rule)
 }
 
@@ -221,5 +236,11 @@ func (h *WAFCORSHandler) Delete(w http.ResponseWriter, r *http.Request, params [
 		core.Error(w, http.StatusInternalServerError, "Gagal menghapus CORS rule: "+err.Error())
 		return
 	}
+
+	actorID := core.GetUserID(ctx)
+	_ = h.auditSvc.Log(ctx, &domain.AuditLog{
+		UserID: &actorID, Action: domain.AuditActionWAFCORSDeleted, ResourceType: "waf_cors", ResourceID: &id,
+		Detail: fmt.Sprintf("CORS rule ID %d dihapus", id),
+	})
 	core.Success(w, "message", "CORS rule berhasil dihapus")
 }

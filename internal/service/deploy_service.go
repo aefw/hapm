@@ -78,7 +78,16 @@ func (s *deployService) Deploy(ctx context.Context, req *domain.DeployRequest) (
 	deployment.ID = id
 
 	// Jalankan pipeline secara asinkron agar endpoint tidak block
-	go s.runPipeline(context.Background(), deployment, req)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[DEPLOY] panic recovered pada deployment %d: %v", id, r)
+				_ = s.deployRepo.UpdateStatus(context.Background(), id, domain.DeployStatusFailed, domain.DeployStageGenerate,
+					fmt.Sprintf("internal error: %v", r))
+			}
+		}()
+		s.runPipeline(context.Background(), deployment, req)
+	}()
 
 	// Re-fetch untuk dapat timestamps dari DB
 	if fetched, err := s.deployRepo.FindByID(ctx, id); err == nil {
@@ -296,6 +305,11 @@ func (s *deployService) runPipeline(ctx context.Context, deployment *domain.Depl
 		updateStatus(domain.DeployStatusRolledBack, domain.DeployStageRollback,
 			fmt.Sprintf("reload gagal: %s", reloadOut))
 		s.logAuditFail(ctx, deployID, userID, nodeID, "reload", err)
+		_ = s.auditSvc.Log(ctx, &domain.AuditLog{
+			UserID: &userID, Action: domain.AuditActionDeployRolledBack,
+			ResourceType: "deployment", ResourceID: &deployID,
+			Detail: fmt.Sprintf("Deploy rolled back for node %d: reload failed", nodeID),
+		})
 		return
 	}
 
@@ -310,6 +324,11 @@ func (s *deployService) runPipeline(ctx context.Context, deployment *domain.Depl
 		doRollback()
 		updateStatus(domain.DeployStatusRolledBack, domain.DeployStageRollback,
 			fmt.Sprintf("haproxy tidak aktif setelah reload: %s", statusOut))
+		_ = s.auditSvc.Log(ctx, &domain.AuditLog{
+			UserID: &userID, Action: domain.AuditActionDeployRolledBack,
+			ResourceType: "deployment", ResourceID: &deployID,
+			Detail: fmt.Sprintf("Deploy rolled back for node %d: haproxy not active after reload", nodeID),
+		})
 		return
 	}
 

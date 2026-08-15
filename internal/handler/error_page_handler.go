@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ type ErrorPageHandler struct {
 	repo        domain.ErrorPageRepository
 	settingsSvc domain.SettingsService
 	snSvc       domain.SNService
+	auditSvc    domain.AuditService
 }
 
 func RegisterErrorPageRoutes(
@@ -25,8 +27,9 @@ func RegisterErrorPageRoutes(
 	repo domain.ErrorPageRepository,
 	settingsSvc domain.SettingsService,
 	snSvc domain.SNService,
+	auditSvc domain.AuditService,
 ) {
-	h := &ErrorPageHandler{cfg: cfg, repo: repo, settingsSvc: settingsSvc, snSvc: snSvc}
+	h := &ErrorPageHandler{cfg: cfg, repo: repo, settingsSvc: settingsSvc, snSvc: snSvc, auditSvc: auditSvc}
 	router.GET("/api/v1/error-pages", middleware.RequireAuth(cfg, h.List))
 	router.PUT("/api/v1/error-pages/{code}", middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleAdmin, h.Update)))
 	router.GET("/api/v1/settings/features/error-pages", middleware.RequireAuth(cfg, h.GetFeature))
@@ -96,6 +99,11 @@ func (h *ErrorPageHandler) Update(w http.ResponseWriter, r *http.Request, params
 		return
 	}
 
+	actorID := core.GetUserID(ctx)
+	_ = h.auditSvc.Log(ctx, &domain.AuditLog{
+		UserID: &actorID, Action: domain.AuditActionErrorPageUpdated, ResourceType: "error_page",
+		Detail: fmt.Sprintf("Konten error page HTTP %d diperbarui", code),
+	})
 	core.Success(w, "error_page", ep)
 }
 
@@ -136,6 +144,11 @@ func (h *ErrorPageHandler) SetFeature(w http.ResponseWriter, r *http.Request, _ 
 		return
 	}
 
+	actorID := core.GetUserID(ctx)
+	_ = h.auditSvc.Log(ctx, &domain.AuditLog{
+		UserID: &actorID, Action: domain.AuditActionErrorPageFeatureToggled, ResourceType: "setting",
+		Detail: fmt.Sprintf("Fitur Custom Error Pages %s", map[bool]string{true: "diaktifkan", false: "dinonaktifkan"}[req.Enabled]),
+	})
 	core.Success(w, "feature", map[string]interface{}{
 		"key":     "custom_error_pages",
 		"enabled": req.Enabled,
