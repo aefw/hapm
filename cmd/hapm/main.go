@@ -159,7 +159,7 @@ func main() {
 	handler.RegisterNodeRoutes(router, cfg, nodeSvc)
 	handler.RegisterBackendRoutes(router, cfg, backendSvc)
 	handler.RegisterDomainRoutes(router, cfg, domainSvc)
-	handler.RegisterCMCRoutes(router, cfg, certSvc, certJobSvc, distSvc, certDeployRepo)
+	handler.RegisterCMCRoutes(router, cfg, certSvc, certJobSvc, distSvc, certDeployRepo, certStore)
 	handler.RegisterSettingsRoutes(router, cfg, settingsSvc)
 	handler.RegisterConfigRoutes(router, cfg, configSvc)
 	handler.RegisterDeployRoutes(router, cfg, deploySvc)

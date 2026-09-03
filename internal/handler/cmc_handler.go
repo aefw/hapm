@@ -2,23 +2,31 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/aefw/hapm/internal/config"
 	"github.com/aefw/hapm/internal/core"
 	"github.com/aefw/hapm/internal/domain"
 	"github.com/aefw/hapm/internal/middleware"
+	"github.com/aefw/hapm/pkg/storage"
 )
 
 // CMCHandler menangani semua endpoint Certificate Management Center
 type CMCHandler struct {
-	certSvc  domain.CertificateService
-	jobSvc   domain.CertJobService
-	distSvc  domain.DistributionService
+	certSvc    domain.CertificateService
+	jobSvc     domain.CertJobService
+	distSvc    domain.DistributionService
 	deployRepo domain.CertDeploymentRepository
-	cfg      *config.Config
+	certStore  *storage.CertStore
+	cfg        *config.Config
 }
+
+var reUUID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 // RegisterCMCRoutes mendaftarkan semua route CMC ke router.
 // Prefix /api/v1/ssl/ dipertahankan untuk kompatibilitas.
@@ -29,10 +37,11 @@ func RegisterCMCRoutes(
 	jobSvc domain.CertJobService,
 	distSvc domain.DistributionService,
 	deployRepo domain.CertDeploymentRepository,
+	certStore *storage.CertStore,
 ) {
 	h := &CMCHandler{
 		certSvc: certSvc, jobSvc: jobSvc, distSvc: distSvc,
-		deployRepo: deployRepo, cfg: cfg,
+		deployRepo: deployRepo, certStore: certStore, cfg: cfg,
 	}
 
 	// Providers
@@ -62,6 +71,14 @@ func RegisterCMCRoutes(
 		middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleAdmin, h.Revoke)))
 	router.GET("/api/v1/ssl/certificates/{uuid}/deployments",
 		middleware.RequireAuth(cfg, h.ListDeployments))
+
+	// Download file (requires auth) — semua 4 file tersedia
+	router.GET("/api/v1/ssl/certificates/{uuid}/download/{file}",
+		middleware.RequireAuth(cfg, h.Download))
+
+	// Download public (tanpa auth) — hanya certificate.pem & chain.pem untuk MikroTik/scheduler
+	router.GET("/api/v1/ssl/public/{uuid}/{file}",
+		h.DownloadPublic)
 
 	// Manual upload
 	router.POST("/api/v1/ssl/upload",
@@ -311,6 +328,96 @@ func (h *CMCHandler) ListCertJobs(w http.ResponseWriter, r *http.Request, params
 		jobs = []*domain.CertJob{}
 	}
 	core.SuccessList(w, "Daftar jobs certificate", jobs)
+}
+
+// Download melayani download file certificate (memerlukan autentikasi).
+// GET /api/v1/ssl/certificates/{uuid}/download/{file}
+// File yang tersedia: certificate.pem, chain.pem, issuer.pem, private.key
+func (h *CMCHandler) Download(w http.ResponseWriter, r *http.Request, params []string) {
+	uuid := params[0]
+	filename := params[1]
+
+	if !reUUID.MatchString(uuid) {
+		core.NotFound(w, "Certificate tidak ditemukan")
+		return
+	}
+
+	allowed := map[string]bool{
+		"certificate.pem": true,
+		"chain.pem":       true,
+		"issuer.pem":      true,
+		"private.key":     true,
+	}
+	if !allowed[filename] {
+		core.NotFound(w, "File tidak ditemukan")
+		return
+	}
+
+	cert, err := h.certSvc.GetByUUID(r.Context(), uuid)
+	if err != nil {
+		core.NotFound(w, "Certificate tidak ditemukan")
+		return
+	}
+
+	h.serveFile(w, r, uuid, filename, cert.Name)
+}
+
+// DownloadPublic melayani download file certificate tanpa autentikasi.
+// GET /api/v1/ssl/public/{uuid}/{file}
+// Hanya certificate.pem dan chain.pem yang boleh diakses publik (untuk MikroTik/scheduler).
+func (h *CMCHandler) DownloadPublic(w http.ResponseWriter, r *http.Request, params []string) {
+	uuid := params[0]
+	filename := params[1]
+
+	if !reUUID.MatchString(uuid) {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Hanya 2 file publik yang diizinkan
+	if filename != "certificate.pem" && filename != "chain.pem" {
+		http.NotFound(w, r)
+		return
+	}
+
+	h.serveFile(w, r, uuid, filename, "")
+}
+
+// serveFile membaca dan mengirim file certificate sebagai attachment download.
+func (h *CMCHandler) serveFile(w http.ResponseWriter, r *http.Request, uuid, filename, certName string) {
+	paths := h.certStore.Paths(uuid)
+
+	var filePath string
+	switch filename {
+	case "certificate.pem":
+		filePath = paths.CertPEM
+	case "chain.pem":
+		filePath = paths.ChainPEM
+	case "issuer.pem":
+		filePath = paths.IssuerPEM
+	case "private.key":
+		filePath = paths.KeyPEM
+	default:
+		http.NotFound(w, r)
+		return
+	}
+
+	if _, err := os.Stat(filePath); err != nil {
+		core.NotFound(w, "File belum tersedia")
+		return
+	}
+
+	// Nama file download: {nama-cert}_{filename} atau langsung filename jika tanpa nama
+	downloadName := filename
+	if certName != "" {
+		safe := strings.NewReplacer(" ", "-", "/", "-", "\\", "-", ":", "-").Replace(certName)
+		downloadName = fmt.Sprintf("%s_%s", safe, filename)
+	}
+
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, downloadName))
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Cache-Control", "no-store")
+	http.ServeFile(w, r, filePath)
 }
 
 // ServeChallenge melayani HTTP-01 ACME challenge files.
