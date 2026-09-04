@@ -343,6 +343,9 @@ func (h *CMCHandler) Download(w http.ResponseWriter, r *http.Request, params []s
 	}
 
 	allowed := map[string]bool{
+		"fullchain.pem":   true,
+		"privkey.pem":     true,
+
 		"certificate.pem": true,
 		"chain.pem":       true,
 		"issuer.pem":      true,
@@ -364,7 +367,10 @@ func (h *CMCHandler) Download(w http.ResponseWriter, r *http.Request, params []s
 
 // DownloadPublic melayani download file certificate tanpa autentikasi.
 // GET /api/v1/ssl/public/{uuid}/{file}
-// Hanya certificate.pem dan chain.pem yang boleh diakses publik (untuk MikroTik/scheduler).
+// File publik yang diizinkan (untuk MikroTik/scheduler):
+//   - fullchain.pem → certificate.pem (leaf + intermediate chain dari LEGO)
+//   - privkey.pem   → private.key
+//   - certificate.pem, chain.pem (alias lama, tetap didukung)
 func (h *CMCHandler) DownloadPublic(w http.ResponseWriter, r *http.Request, params []string) {
 	uuid := params[0]
 	filename := params[1]
@@ -374,8 +380,13 @@ func (h *CMCHandler) DownloadPublic(w http.ResponseWriter, r *http.Request, para
 		return
 	}
 
-	// Hanya 2 file publik yang diizinkan
-	if filename != "certificate.pem" && filename != "chain.pem" {
+	publicAllowed := map[string]bool{
+		"fullchain.pem":   true,
+		"privkey.pem":     true,
+		"certificate.pem": true,
+		"chain.pem":       true,
+	}
+	if !publicAllowed[filename] {
 		http.NotFound(w, r)
 		return
 	}
@@ -389,14 +400,17 @@ func (h *CMCHandler) serveFile(w http.ResponseWriter, r *http.Request, uuid, fil
 
 	var filePath string
 	switch filename {
-	case "certificate.pem":
+	case "fullchain.pem", "certificate.pem":
+		// fullchain.pem = alias MikroTik/certbot; keduanya mengarah ke certificate.pem
+		// yang sudah berisi fullchain (cert + intermediate) hasil LEGO
 		filePath = paths.CertPEM
+	case "privkey.pem", "private.key":
+		// privkey.pem = alias MikroTik/certbot; keduanya mengarah ke private.key
+		filePath = paths.KeyPEM
 	case "chain.pem":
 		filePath = paths.ChainPEM
 	case "issuer.pem":
 		filePath = paths.IssuerPEM
-	case "private.key":
-		filePath = paths.KeyPEM
 	default:
 		http.NotFound(w, r)
 		return
