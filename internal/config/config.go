@@ -26,6 +26,7 @@ type Config struct {
 type AppConfig struct {
 	Name    string
 	Mode    string // development | production
+	Host    string // bind address; kosong = semua interface
 	Port    int
 	BaseURL string
 }
@@ -102,6 +103,7 @@ func Load() (*Config, error) {
 	// App
 	cfg.App.Name = getEnv("APP_NAME", "HAProxy Manager")
 	cfg.App.Mode = getEnv("APP_MODE", "production")
+	cfg.App.Host = getEnv("APP_HOST", "")
 	cfg.App.BaseURL = getEnv("APP_BASE_URL", "http://localhost:8282")
 	port, err := strconv.Atoi(getEnv("APP_PORT", "8282"))
 	if err != nil {

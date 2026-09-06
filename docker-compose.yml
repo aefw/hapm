@@ -33,6 +33,9 @@ services:
       APP_NAME: ${APP_NAME:-HAProxy Manager}
       APP_MODE: ${APP_MODE:-production}
       APP_PORT: "8282"
+      # APP_HOST: bind address server (default: 0.0.0.0 = semua interface)
+      # Isi dengan IP private jika ingin membatasi binding, contoh: APP_HOST=10.1.0.2
+      APP_HOST: ${APP_HOST:-}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8282}
 
       # Database

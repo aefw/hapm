@@ -32,7 +32,7 @@ func NewApp(cfg *config.Config, router *Router) *App {
 // Run memulai HTTP server dan menunggu sinyal shutdown.
 // Mendukung graceful shutdown dengan timeout 30 detik.
 func (a *App) Run(handler http.Handler) error {
-	addr := fmt.Sprintf(":%d", a.Config.App.Port)
+	addr := fmt.Sprintf("%s:%d", a.Config.App.Host, a.Config.App.Port)
 
 	a.Server = &http.Server{
 		Addr:         addr,
