@@ -745,7 +745,7 @@ func (p *provisioner) installDebian(ctx context.Context, conn *ssh.Connection, p
 	installCmds := []string{
 		"sudo apt-get update -qq",
 		fmt.Sprintf("sudo apt-get install -y --no-install-recommends haproxy=%s.*", hapLTSVersion),
-		"haproxy -v",
+		"sudo haproxy -v",
 	}
 	for _, cmd := range installCmds {
 		if out, err := p.sshClient.RunCommand(ctx, conn, cmd); err != nil {
@@ -770,7 +770,7 @@ func (p *provisioner) installRHEL(ctx context.Context, conn *ssh.Connection, pro
 	progressFn(3)
 	installCmds := []string{
 		"sudo yum install -y haproxy socat curl || sudo dnf install -y haproxy socat curl",
-		"haproxy -v",
+		"sudo haproxy -v",
 	}
 	for _, cmd := range installCmds {
 		if out, err := p.sshClient.RunCommand(ctx, conn, cmd); err != nil {
@@ -801,7 +801,7 @@ func (p *provisioner) installAcmeSh(ctx context.Context, conn *ssh.Connection) e
 
 // GetVersion mengambil versi HAProxy yang terinstall pada node
 func (p *provisioner) GetVersion(ctx context.Context, conn *ssh.Connection) (string, error) {
-	output, err := p.sshClient.RunCommand(ctx, conn, "haproxy -v 2>&1 | head -1")
+	output, err := p.sshClient.RunCommand(ctx, conn, "sudo haproxy -v 2>&1 | head -1")
 	if err != nil {
 		return "", fmt.Errorf("provisioner: get version: %w", err)
 	}
