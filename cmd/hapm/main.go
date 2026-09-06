@@ -187,6 +187,7 @@ func main() {
 	// Mux utama: /api/ → router (API), / → frontend SPA
 	mainMux := http.NewServeMux()
 	mainMux.Handle("/api/", router)
+	mainMux.Handle("/.well-known/", router) // HTTP-01 ACME challenge
 	mainMux.Handle("/", web.Handler())
 
 	var h http.Handler = mainMux
