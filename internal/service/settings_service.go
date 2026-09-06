@@ -82,8 +82,8 @@ func (s *settingsService) DiscoverCloudflareZones(ctx context.Context, inputToke
 
 func (s *settingsService) GetACMEEmail(ctx context.Context) (string, error) {
 	setting, err := s.repo.Get(ctx, domain.SettingACMEEmail)
-	if err != nil {
-		return "acme@hapm.local", nil
+	if err != nil || setting.Value == "" {
+		return "", fmt.Errorf("email ACME belum dikonfigurasi — silakan atur di Settings › ACME sebelum menerbitkan sertifikat")
 	}
 	return setting.Value, nil
 }

@@ -288,7 +288,14 @@ func (s *certificateService) runIssueJob(ctx context.Context, cert *domain.Certi
 	_ = s.jobRepo.UpdateStatus(ctx, jobUUID, domain.JobStatusRunning, "", "")
 
 	cfToken, _ := s.settingsSvc.GetCloudflareToken(ctx)
-	email, _ := s.settingsSvc.GetACMEEmail(ctx)
+	email, emailErr := s.settingsSvc.GetACMEEmail(ctx)
+	if emailErr != nil {
+		_ = s.jobRepo.UpdateStatus(ctx, jobUUID, domain.JobStatusFailed, "", emailErr.Error())
+		cert.Status = domain.CertStatusError
+		cert.ErrorMessage = emailErr.Error()
+		_ = s.certRepo.Update(ctx, cert)
+		return
+	}
 	staging, _ := s.settingsSvc.IsACMEStaging(ctx)
 
 	req := &acme.IssueRequest{
@@ -391,7 +398,13 @@ func (s *certificateService) runRenewJob(ctx context.Context, cert *domain.Certi
 	_ = s.jobRepo.UpdateStatus(ctx, jobUUID, domain.JobStatusRunning, "", "")
 
 	cfToken, _ := s.settingsSvc.GetCloudflareToken(ctx)
-	email, _ := s.settingsSvc.GetACMEEmail(ctx)
+	email, emailErr := s.settingsSvc.GetACMEEmail(ctx)
+	if emailErr != nil {
+		_ = s.jobRepo.UpdateStatus(ctx, jobUUID, domain.JobStatusFailed, "", emailErr.Error())
+		cert.ErrorMessage = emailErr.Error()
+		_ = s.certRepo.Update(ctx, cert)
+		return
+	}
 	staging, _ := s.settingsSvc.IsACMEStaging(ctx)
 
 	req := &acme.RenewRequest{
@@ -468,7 +481,7 @@ func (s *certificateService) Revoke(ctx context.Context, id string, actorID int)
 	}
 	defer s.certRepo.Unlock(ctx, id)
 
-	email, _ := s.settingsSvc.GetACMEEmail(ctx)
+	email, _ := s.settingsSvc.GetACMEEmail(ctx) // email kosong pada revoke tidak diblokir
 	staging, _ := s.settingsSvc.IsACMEStaging(ctx)
 
 	req := &acme.RevokeRequest{
