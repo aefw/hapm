@@ -156,6 +156,29 @@ func (s *settingsService) SetWAFEnabled(ctx context.Context, enabled bool) error
 	return nil
 }
 
+func (s *settingsService) GetCMCChallengeAddr(ctx context.Context) (string, error) {
+	setting, err := s.repo.Get(ctx, domain.SettingCMCChallengeAddr)
+	if err == nil && setting.Value != "" {
+		return setting.Value, nil
+	}
+	// Fallback ke env CMC_CHALLENGE_ADDR
+	if s.cfg.CMC.ChallengeAddr != "" {
+		return s.cfg.CMC.ChallengeAddr, nil
+	}
+	return "", nil
+}
+
+func (s *settingsService) SetCMCChallengeAddr(ctx context.Context, addr string) error {
+	if err := s.repo.Set(ctx, domain.SettingCMCChallengeAddr, addr, false); err != nil {
+		return fmt.Errorf("simpan CMC challenge addr gagal: %w", err)
+	}
+	_ = s.auditSvc.Log(ctx, &domain.AuditLog{
+		Action: domain.AuditActionSettingUpdated, ResourceType: "setting",
+		Detail: fmt.Sprintf("CMC challenge addr diubah ke %s", addr),
+	})
+	return nil
+}
+
 // ─── Cloudflare API helpers ───────────────────────────────────────────────────
 
 type cfTokenResult struct {

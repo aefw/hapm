@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aefw/hapm/internal/config"
 	"github.com/aefw/hapm/internal/domain"
 	"github.com/aefw/hapm/pkg/haproxy"
 )
 
 // configService implements domain.ConfigService
 type configService struct {
+	cfg           *config.Config
 	nodeRepo      domain.NodeRepository
 	backendRepo   domain.BackendRepository
 	domainRepo    domain.DomainRepository
@@ -27,6 +29,7 @@ type configService struct {
 
 // NewConfigService membuat instance ConfigService baru
 func NewConfigService(
+	cfg *config.Config,
 	nodeRepo domain.NodeRepository,
 	backendRepo domain.BackendRepository,
 	domainRepo domain.DomainRepository,
@@ -39,6 +42,7 @@ func NewConfigService(
 	generator haproxy.Generator,
 ) domain.ConfigService {
 	return &configService{
+		cfg:           cfg,
 		nodeRepo:      nodeRepo,
 		backendRepo:   backendRepo,
 		domainRepo:    domainRepo,
@@ -125,7 +129,14 @@ func (s *configService) GenerateForNode(ctx context.Context, nodeID int) (*domai
 		}
 	}
 
-	content, hostsMap, err := s.generator.Generate(ctx, node, domains, pools, certs, services, authGroups, activeErrorPages, wafConfig)
+	var challengeAddrVal string
+	if challengeAddrSetting, err := s.settingRepo.Get(ctx, domain.SettingCMCChallengeAddr); err == nil && challengeAddrSetting.Value != "" {
+		challengeAddrVal = challengeAddrSetting.Value
+	} else {
+		challengeAddrVal = s.cfg.CMC.ChallengeAddr
+	}
+
+	content, hostsMap, err := s.generator.Generate(ctx, node, domains, pools, certs, services, authGroups, activeErrorPages, wafConfig, challengeAddrVal)
 	if err != nil {
 		return nil, fmt.Errorf("config: generate: %w", err)
 	}

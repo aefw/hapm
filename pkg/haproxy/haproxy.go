@@ -17,7 +17,8 @@ import (
 type Generator interface {
 	// Generate menghasilkan (haproxy.cfg content, hosts.map content, error).
 	// wafConfig nil berarti WAF dinonaktifkan — tidak ada WAF directives yang digenerate.
-	Generate(ctx context.Context, node *domain.Node, domains []*domain.DomainEntry, pools []*domain.BackendPool, certs []*domain.Certificate, services []*domain.Service, authGroups []*domain.AuthGroup, errorPages []*domain.ErrorPage, wafConfig *domain.WAFConfig) (string, string, error)
+	// challengeAddr adalah IP:PORT HAPM yang bisa diakses HAProxy node untuk HTTP-01 ACME challenge.
+	Generate(ctx context.Context, node *domain.Node, domains []*domain.DomainEntry, pools []*domain.BackendPool, certs []*domain.Certificate, services []*domain.Service, authGroups []*domain.AuthGroup, errorPages []*domain.ErrorPage, wafConfig *domain.WAFConfig, challengeAddr string) (string, string, error)
 }
 
 // Validator mendefinisikan kontrak untuk validasi konfigurasi HAProxy
@@ -70,6 +71,7 @@ func (g *generator) Generate(
 	authGroups []*domain.AuthGroup,
 	errorPages []*domain.ErrorPage,
 	wafConfig *domain.WAFConfig,
+	challengeAddr string,
 ) (string, string, error) {
 	var sb strings.Builder
 	var hm strings.Builder // content untuk /etc/haproxy/map/hosts
@@ -162,10 +164,15 @@ func (g *generator) Generate(
 	}
 
 	// ── ACME challenge backend (HTTP-01) ──
-	// Selalu ada agar acme.sh HTTP-01 bisa berjalan tanpa mengganggu traffic
+	// Selalu ada agar HTTP-01 challenge bisa berjalan tanpa mengganggu traffic.
+	// challengeAddr dikonfigurasi di Settings › CMC; default 127.0.0.1:8282.
+	acmeChallengeServer := challengeAddr
+	if acmeChallengeServer == "" {
+		acmeChallengeServer = "127.0.0.1:8282"
+	}
 	sb.WriteString("backend acme_challenge\n")
 	sb.WriteString("    mode http\n")
-	sb.WriteString("    server acme_local 127.0.0.1:8888\n\n")
+	sb.WriteString(fmt.Sprintf("    server acme_local %s\n\n", acmeChallengeServer))
 
 	// ── HTTP frontend (port 80) ──
 	// Urutan HAProxy yang benar: acl → http-request → use_backend

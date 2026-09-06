@@ -33,6 +33,12 @@ func RegisterSettingsRoutes(router *core.Router, cfg *config.Config, settingsSvc
 		middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleSuperAdmin, h.SetACME)))
 	router.GET("/api/v1/settings/acme",
 		middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleAdmin, h.GetACME)))
+
+	// CMC settings
+	router.PUT("/api/v1/settings/cmc",
+		middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleSuperAdmin, h.SetCMC)))
+	router.GET("/api/v1/settings/cmc",
+		middleware.RequireAuth(cfg, middleware.RequireRole(middleware.RoleAdmin, h.GetCMC)))
 }
 
 // SetCloudflare godoc
@@ -124,5 +130,32 @@ func (h *SettingsHandler) GetACME(w http.ResponseWriter, r *http.Request, _ []st
 	core.Success(w, "ACME settings", map[string]interface{}{
 		"email":   email,
 		"staging": staging,
+	})
+}
+
+// SetCMC godoc
+// PUT /api/v1/settings/cmc   [SuperAdmin]
+// Body: {"challenge_addr":"IP:PORT"}
+func (h *SettingsHandler) SetCMC(w http.ResponseWriter, r *http.Request, _ []string) {
+	var req struct {
+		ChallengeAddr string `json:"challenge_addr"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		core.BadRequest(w, "Body request tidak valid")
+		return
+	}
+	if err := h.settingsSvc.SetCMCChallengeAddr(r.Context(), req.ChallengeAddr); err != nil {
+		handleServiceError(w, err)
+		return
+	}
+	core.Success(w, "CMC settings berhasil disimpan", nil)
+}
+
+// GetCMC godoc
+// GET /api/v1/settings/cmc   [Admin+]
+func (h *SettingsHandler) GetCMC(w http.ResponseWriter, r *http.Request, _ []string) {
+	addr, _ := h.settingsSvc.GetCMCChallengeAddr(r.Context())
+	core.Success(w, "CMC settings", map[string]interface{}{
+		"challenge_addr": addr,
 	})
 }

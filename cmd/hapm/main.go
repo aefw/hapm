@@ -102,7 +102,7 @@ func main() {
 	certJobSvc := service.NewCertJobService(certJobRepo)
 	distSvc := service.NewDistributionService(cfg, certRepo, certDeployRepo, nodeRepo, certStore, sshClient, auditSvc)
 	schedulerSvc := service.NewSchedulerService(certRepo, certJobRepo, certSvc, distSvc)
-	configSvc := service.NewConfigService(nodeRepo, backendRepo, domainRepo, certRepo, serviceRepo, authGroupRepo, errorPageRepo, settingRepo, wafGenRepo, haproxyGen)
+	configSvc := service.NewConfigService(cfg, nodeRepo, backendRepo, domainRepo, certRepo, serviceRepo, authGroupRepo, errorPageRepo, settingRepo, wafGenRepo, haproxyGen)
 	serviceSvc := service.NewServiceService(serviceRepo, backendRepo, auditSvc)
 	revisionSvc := service.NewRevisionService(revisionRepo, auditSvc)
 	deploySvc := service.NewDeployService(cfg, nodeRepo, domainRepo, certRepo, certStore, configSvc, revisionRepo, deployRepo, sshClient, haproxyVal, auditSvc)

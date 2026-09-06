@@ -342,6 +342,9 @@ func (h *CMCHandler) Download(w http.ResponseWriter, r *http.Request, params []s
 		return
 	}
 
+	// Certbot => Lego
+	// fullchain.pem => certificate.pem
+	// privkey.pem   => private.key
 	allowed := map[string]bool{
 		"fullchain.pem":   true,
 		"privkey.pem":     true,

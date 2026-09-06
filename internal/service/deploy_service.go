@@ -401,7 +401,7 @@ func (s *deployService) pushCertsToNode(ctx context.Context, conn *ssh.Connectio
 		// Upload ke /tmp dulu (user-writable), lalu sudo mv ke /etc/haproxy/certs/
 		// karena direktori certs/ dimiliki root (700) dan tidak bisa ditulis langsung via SCP.
 		destPath := fmt.Sprintf("/etc/haproxy/certs/%s.pem", uuid)
-		tmpPath  := fmt.Sprintf("/tmp/hapm_cert_%s.pem", uuid)
+		tmpPath := fmt.Sprintf("/tmp/hapm_cert_%s.pem", uuid)
 		if err := s.sshClient.UploadFile(ctx, conn, []byte(bundle), tmpPath); err != nil {
 			log.Printf("[WARN] pushCertsToNode: upload cert %s ke /tmp gagal: %v", uuid, err)
 			continue

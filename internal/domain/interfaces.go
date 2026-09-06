@@ -497,6 +497,8 @@ type SettingsService interface {
 	SetCustomErrorPagesEnabled(ctx context.Context, enabled bool) error
 	IsWAFEnabled(ctx context.Context) (bool, error)
 	SetWAFEnabled(ctx context.Context, enabled bool) error
+	GetCMCChallengeAddr(ctx context.Context) (string, error)
+	SetCMCChallengeAddr(ctx context.Context, addr string) error
 }
 
 // GeneratedConfig adalah hasil generate konfigurasi HAProxy
