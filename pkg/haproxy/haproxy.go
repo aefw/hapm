@@ -228,7 +228,7 @@ func (g *generator) Generate(
 		}
 		aclName := "host_auth_" + sanitizeName(d.DomainName)
 		realm := sanitizeName(d.DomainName)
-		sb.WriteString(fmt.Sprintf("    http-request auth realm %s if %s !{ http_auth(%s) }\n", realm, aclName, ulName))
+		sb.WriteString(fmt.Sprintf("    http-request auth realm %s if %s !{ http_auth(%s) } !{ method OPTIONS }\n", realm, aclName, ulName))
 	}
 
 	// use_backend setelah semua http-request rules (urutan benar untuk HAProxy)
@@ -270,7 +270,7 @@ func (g *generator) Generate(
 			aclName := "host_auth_" + sanitizeName(d.DomainName)
 			realm := sanitizeName(d.DomainName)
 			sb.WriteString(fmt.Sprintf("    acl %s hdr(host) -i %s\n", aclName, d.DomainName))
-			sb.WriteString(fmt.Sprintf("    http-request auth realm %s if %s !{ http_auth(%s) }\n", realm, aclName, ulName))
+			sb.WriteString(fmt.Sprintf("    http-request auth realm %s if %s !{ http_auth(%s) } !{ method OPTIONS }\n", realm, aclName, ulName))
 		}
 
 		// Routing via hosts.map — satu directive untuk semua domain SSL terminate
