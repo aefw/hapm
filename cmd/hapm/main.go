@@ -37,6 +37,11 @@ func main() {
 		log.Fatalf("[FATAL] Gagal load konfigurasi: %v", err)
 	}
 
+	// Auto-create direktori upload jika belum ada
+	if err := os.MkdirAll(cfg.App.UploadPath, 0755); err != nil {
+		log.Fatalf("[FATAL] Gagal membuat direktori upload %s: %v", cfg.App.UploadPath, err)
+	}
+
 	// ─── 2. Inisialisasi database ──────────────────────────────────
 	db, err := sqlite.NewDB(cfg)
 	if err != nil {
@@ -187,7 +192,8 @@ func main() {
 	// Mux utama: /api/ → router (API), / → frontend SPA
 	mainMux := http.NewServeMux()
 	mainMux.Handle("/api/", router)
-	mainMux.Handle("/.well-known/", router) // HTTP-01 ACME challenge
+	mainMux.Handle("/.well-known/", router)                                         // HTTP-01 ACME challenge
+	mainMux.Handle("/upload/", handler.UploadFileServer(cfg.App.UploadPath))        // file share publik
 	mainMux.Handle("/", web.Handler())
 
 	var h http.Handler = mainMux

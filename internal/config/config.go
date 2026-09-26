@@ -24,11 +24,12 @@ type Config struct {
 
 // AppConfig konfigurasi umum aplikasi
 type AppConfig struct {
-	Name    string
-	Mode    string // development | production
-	Host    string // bind address; kosong = semua interface
-	Port    int
-	BaseURL string
+	Name       string
+	Mode       string // development | production
+	Host       string // bind address; kosong = semua interface
+	Port       int
+	BaseURL    string
+	UploadPath string // direktori file share publik (data/upload)
 }
 
 // DBConfig konfigurasi database
@@ -159,6 +160,7 @@ func Load() (*Config, error) {
 
 	// CMC — Certificate Management Center
 	base := dataDir()
+	cfg.App.UploadPath = getEnv("APP_UPLOAD_PATH", base+"/upload")
 	cfg.CMC.StoragePath = getEnv("CMC_STORAGE_PATH", base+"/storage/certificates")
 	cfg.CMC.WebRootPath = getEnv("CMC_WEBROOT_PATH", base+"/acme-webroot")
 	cfg.CMC.ACMEServiceURL = getEnv("CMC_ACME_SERVICE_URL", "http://hapm-acme:8889")
