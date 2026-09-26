@@ -24,6 +24,7 @@ type ErrorCodeInfo struct {
 // SupportedErrorCodes adalah daftar HTTP error code yang didukung HAProxy errorfile
 var SupportedErrorCodes = []ErrorCodeInfo{
 	{Code: 400, Message: "Bad Request"},
+	{Code: 401, Message: "Unauthorized"},
 	{Code: 403, Message: "Forbidden"},
 	{Code: 404, Message: "Not Found"},
 	{Code: 408, Message: "Request Timeout"},

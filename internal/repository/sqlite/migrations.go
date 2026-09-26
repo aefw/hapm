@@ -703,6 +703,11 @@ CREATE INDEX IF NOT EXISTS idx_waf_domain_bindings
 		name:    "error_pages_add_429",
 		sql:     `INSERT OR IGNORE INTO error_pages (error_code) VALUES (429);`,
 	},
+	{
+		version: 45,
+		name:    "error_pages_add_401",
+		sql:     `INSERT OR IGNORE INTO error_pages (error_code) VALUES (401);`,
+	},
 }
 
 // RunMigrations menjalankan semua migrasi yang belum diaplikasikan.
