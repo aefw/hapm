@@ -26,7 +26,7 @@ services:
       - "${APP_PORT:-8282}:8282"
 
     volumes:
-      - hapm_data:/data
+      - ./data:/data
 
     environment:
       # App
@@ -111,7 +111,7 @@ services:
     restart: unless-stopped
 
     volumes:
-      - hapm_data:/data
+      - ./data:/data
 
     environment:
       ACME_PORT: "8889"
@@ -146,14 +146,6 @@ services:
 
     networks:
       - hapm_net
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Volumes
-# ─────────────────────────────────────────────────────────────────────────────
-volumes:
-  hapm_data:
-    name: hapm_data
-    driver: local
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Networks
