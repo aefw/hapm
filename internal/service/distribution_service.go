@@ -123,7 +123,7 @@ func (s *distributionService) deployToNode(ctx context.Context, d *domain.CertDe
 	}
 
 	// Graceful reload HAProxy (tidak restart)
-	if out, err := s.ssh.RunCommand(ctx, conn, "haproxy -sf $(cat /var/run/haproxy.pid) || systemctl reload haproxy || service haproxy reload"); err != nil {
+	if out, err := s.ssh.RunCommand(ctx, conn, "sudo systemctl reload haproxy 2>&1 || sudo service haproxy reload 2>&1"); err != nil {
 		_ = s.deployRepo.UpdateStatus(ctx, d.UUID, string(domain.DeployStatusFailed),
 			fmt.Sprintf("graceful reload gagal: %v\noutput: %s", err, out))
 		return

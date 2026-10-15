@@ -796,7 +796,7 @@ Jika `node_ids` kosong atau tidak disertakan → deploy ke **semua node** secara
 Proses deployment per node:
 1. Build HAProxy bundle: `certificate.pem + chain.pem + private.key`
 2. Upload ke node via SSH: `/etc/haproxy/certs/<uuid>.pem`
-3. Graceful reload HAProxy: `haproxy -sf $(cat /var/run/haproxy.pid) || systemctl reload haproxy`
+3. Graceful reload HAProxy: `sudo systemctl reload haproxy || sudo service haproxy reload`
 
 #### Upload Certificate Manual
 
