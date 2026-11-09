@@ -39,18 +39,15 @@
 
 ### Langkah Instalasi
 
-**1. Clone repository** *(hanya untuk mendapatkan `docker-compose.yml` dan `.env.example`)*
+**1. Download file konfigurasi**
 
 ```bash
-git clone https://github.com/aefw/hapm.git
-cd hapm
+mkdir hapm && cd hapm
+curl -fsSL https://raw.githubusercontent.com/aefw/hapm/main/docker-compose.yml -o docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/aefw/hapm/main/.env.example -o .env
 ```
 
-**2. Buat file konfigurasi**
-
-```bash
-cp .env.example .env
-```
+> Tidak perlu `git clone`. Hanya dua file ini yang dibutuhkan — image di-pull otomatis oleh Docker dari GitHub Container Registry.
 
 **3. Edit `.env` — isi nilai wajib berikut**
 
